@@ -10,9 +10,10 @@ class ReplayBuffer:
 
     def __getitem__(self, index):
         item = self.replay_buffer[index]
-        state, action, reward, done, new_state = item
-        return state, action, reward, done, new_state
+        # state, action, reward, done, new_state = item
+        # return state, action, reward, done, new_state
         # return item.state, item.action, item.reward, item.done, item.new_state
+        return item
 
     def append(self, item):
         self.replay_buffer.append(item)
