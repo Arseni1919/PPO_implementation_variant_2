@@ -2,6 +2,13 @@ from GLOBALS import *
 from alg_env_wrapper import SingleAgentEnv
 
 
+def load_and_play(env_to_play, times, path_to_load_model):
+    # Example runs
+    model = torch.load(path_to_load_model)
+    model.eval()
+    play(env_to_play, times, model=model)
+
+
 def play(env, times: int = 1, model: nn.Module = None):
     state = env.reset()
     game = 0
