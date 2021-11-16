@@ -8,9 +8,9 @@ from play import play
 from alg_functions import *
 torch.autograd.set_detect_anomaly(True)
 
-plotter = ALGPlotter(plot_life=PLOT_LIVE, plot_neptune=NEPTUNE, name='my_run', tags=[SINGLE_AGENT_ENV_NAME])
+plotter = ALGPlotter(plot_life=PLOT_LIVE, plot_neptune=NEPTUNE, name='my_run', tags=[ENV_NAME])
 plotter.neptune_set_parameters()
-env = SingleAgentEnv(env_name=SINGLE_AGENT_ENV_NAME, plotter=plotter)
+env = SingleAgentEnv(env_name=ENV_NAME, plotter=plotter)
 
 # --------------------------- # NETS # -------------------------- #
 critic = CriticNet(obs_size=env.observation_size(), n_actions=env.action_size(), n_agents=1)

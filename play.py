@@ -29,5 +29,5 @@ if __name__ == '__main__':
     # torch.save(target_actor, f'{SAVE_PATH}/target_actor.pt')
     actor_model = torch.load(f'{SAVE_PATH}/actor.pt')
     actor_model.eval()
-    curr_env = SingleAgentEnv(env_name=SINGLE_AGENT_ENV_NAME)
+    curr_env = SingleAgentEnv(env_name=ENV_NAME)
     play(curr_env, 10, actor_model)

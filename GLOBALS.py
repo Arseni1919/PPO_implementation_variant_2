@@ -33,10 +33,10 @@ load_dotenv()
 # ------------------------------------------- #
 # ------------------FOR ENV:----------------- #
 # ------------------------------------------- #
-SINGLE_AGENT_ENV_NAME = "MountainCarContinuous-v0"
-# SINGLE_AGENT_ENV_NAME = "CartPole-v1"
-# SINGLE_AGENT_ENV_NAME = 'LunarLanderContinuous-v2'
-# SINGLE_AGENT_ENV_NAME = "BipedalWalker-v3"
+ENV_NAME = "MountainCarContinuous-v0"
+# ENV_NAME = "CartPole-v1"
+# ENV_NAME = 'LunarLanderContinuous-v2'
+# ENV_NAME = "BipedalWalker-v3"
 from pettingzoo.mpe import simple_spread_v2
 MAX_CYCLES = 25
 # MAX_CYCLES = 75

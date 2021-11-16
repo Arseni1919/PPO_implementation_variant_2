@@ -80,4 +80,4 @@ class MultiAgentEnv:
         pass
 
 
-# env = SingleAgentEnv(env_name=SINGLE_AGENT_ENV_NAME)
+# env = SingleAgentEnv(env_name=ENV_NAME)

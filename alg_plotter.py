@@ -39,8 +39,8 @@ class ALGPlotter:
 
     def neptune_init(self):
         if self.plot_neptune:
-            self.run = neptune.init(project='1919ars/MountainCarDDPG', api_token=os.environ['NEPTUNE_API_TOKEN'],
-                                    tags=self.tags, name=f'{self.name}_mountainCar',
+            self.run = neptune.init(project='1919ars/PPO_variant_2', api_token=os.environ['NEPTUNE_API_TOKEN'],
+                                    tags=self.tags, name=f'{self.name}_{ENV_NAME}',
                                     # source_files=['alg_constrants_amd_packages.py'],
                                     )
 
@@ -143,10 +143,6 @@ class ALGPlotter:
     def close(self):
         if self.plot_neptune:
             self.run.stop()
-            # file_path = '.neptune'
-            # if os.path.exists(file_path):
-            #     # removing the file using the os.remove() method
-            #     os.remove(file_path)
         if self.plot_life:
             plt.close()
 

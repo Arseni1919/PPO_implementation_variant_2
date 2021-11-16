@@ -1,4 +1,4 @@
-# PPO implementation (Version II)
+# PPO implementation (Variant II)
 
 ## PPO
 
