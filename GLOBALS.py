@@ -50,10 +50,10 @@ SAVE_RESULTS = True
 # SAVE_RESULTS = False
 SAVE_PATH = 'data'
 
-NEPTUNE = True
-# NEPTUNE = False
-PLOT_LIVE = True
-# PLOT_LIVE = False
+# NEPTUNE = True
+NEPTUNE = False
+# PLOT_LIVE = True
+PLOT_LIVE = False
 RENDER_WHILE_TRAINING = False
 
 # ------------------------------------------- #

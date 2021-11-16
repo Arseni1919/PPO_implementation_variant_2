@@ -49,7 +49,7 @@ class CriticNet(nn.Module):
     # hidden_size: size of hidden layers
     """
 
-    def __init__(self, obs_size: int, n_actions: int, n_agents: int):
+    def __init__(self, obs_size: int, n_actions: int, n_agents: int = 1):
         super(CriticNet, self).__init__()
         self.fc1 = nn.Linear(obs_size * n_agents, 64)
         self.fc2 = nn.Linear(64, obs_size * n_agents)

@@ -9,6 +9,7 @@ def play(env, times: int = 1, model: nn.Module = None):
     while game < times:
         if model:
             action = model(state)
+            # print(action.item())
         else:
             action = env.action_space.sample()
         next_state, reward, done, _ = env.step(action)
