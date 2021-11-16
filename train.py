@@ -2,7 +2,7 @@ from alg_plotter import ALGPlotter
 from alg_env_wrapper import SingleAgentEnv
 from alg_nets import *
 from alg_replay_buffer import ReplayBuffer
-from play import load_and_play
+from play import load_and_play, play
 from alg_functions import *
 
 
@@ -22,30 +22,66 @@ def train():
             minibatch.append(trajectory)
 
         # COMPUTE REWARDS-TO-GO
-        # TODO
+        rewards_to_go, critic_values, advantages = [], [], []
+        for traj in minibatch:
+            observations, clipped_actions, rewards, dones, new_observations = zip(*traj)
+            i_rewards_to_go = compute_rewards_to_go(rewards)
+            rewards_to_go.append(i_rewards_to_go)
+            i_critic_values = [critic(observation) for observation in observations]
+            critic_values.append(i_critic_values)
 
-        # COMPUTE ADVANTAGES
-        # TODO
+            # COMPUTE ADVANTAGES
+            i_advantages = i_rewards_to_go - i_critic_values
+            advantages.append(i_advantages)
 
         # UPDATE ACTOR
-        # TODO
+        actor_optim.zero_grad()
+        actor_loss = - critic(b_observations, actor(b_observations)).mean()
+        actor_loss.backward()
+        actor_optim.step()
 
         # UPDATE CRITIC
-        # TODO
+        loss = nn.MSELoss()
+        critic_optim.zero_grad()
+        critic_loss_input = critic(state=b_observations, action=b_actions).squeeze()
+        critic_loss = F.mse_loss(critic_loss_input, y)
+        critic_loss.backward()
+        critic_optim.step()
 
         # PLOTTER
-        # TODO
+        plotter.neptune_plot({'loss_critic': critic_loss.item(), 'loss_actor': actor_loss.item()})
+        mse_critic = matrix_mse_mats(plotter.matrix_get_prev('critic'), matrix_get(critic))
+        plotter.neptune_plot({'mse_critic': mse_critic})
+        mat1 = plotter.matrix_get_prev('actor')
+        mat2 = matrix_get(actor)
+        mse_actor = matrix_mse_mats(mat1, mat2)
+        plotter.neptune_plot({'mse_actor': mse_actor})
+        plotter.neptune_plot({'max_diff_actor': np.max(np.abs(mat1 - mat2))})
 
         # RENDER
-        # TODO
+        if i_update % 4 == 0:
+            play(env, 1, actor)
 
-        pass
     # ---------------------------------------------------------------- #
 
     # FINISH TRAINING
     plotter.close()
     env.close()
     plotter.info('Finished train.')
+
+
+def compute_critic_values(observations):
+    i_critic_values = [critic(observation) for observation in observations]
+    return i_critic_values
+
+
+def compute_rewards_to_go(rewards):
+    Val = 0
+    Vals = np.zeros_like(rewards)
+    for t in reversed(range(len(rewards))):
+        Val = rewards[t] + GAMMA * Val
+        Vals[t] = Val
+    return Vals
 
 
 def get_trajectory(p):
