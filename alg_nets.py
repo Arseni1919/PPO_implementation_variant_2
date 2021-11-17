@@ -14,19 +14,20 @@ class ActorNet(nn.Module):
         super(ActorNet, self).__init__()
         self.fc1 = nn.Linear(obs_size, 64)
         self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, n_actions)
+        self.head_mean = nn.Linear(64, n_actions)
+        self.head_log_std = nn.Linear(64, n_actions)  # to be always positive number
         init.xavier_normal_(self.fc1.weight)
         init.xavier_normal_(self.fc2.weight)
         init.xavier_normal_(self.fc3.weight)
 
-        self.net = nn.Sequential(
+        self.body_net = nn.Sequential(
             self.fc1,
             nn.ELU(),
             self.fc2,
             nn.ELU(),
-            self.fc3,
-            nn.Tanh(),
-            # nn.Sigmoid(),
+            # self.fc3,
+            # nn.Tanh(),
+            # # nn.Sigmoid(),
         )
 
         self.n_actions = n_actions
@@ -37,9 +38,11 @@ class ActorNet(nn.Module):
         # if type(state) is np.ndarray:
         #     state = Variable(torch.from_numpy(state).float().unsqueeze(0))
         state = state.float()
-        value = self.net(state)
+        value = self.body_net(state)
+        action_mean = F.tanh(self.head_mean(value))
+        action_std = torch.exp(self.head_log_std(value))
 
-        return value
+        return action_mean, action_std
 
 
 class CriticNet(nn.Module):

@@ -71,7 +71,7 @@ class Actor(nn.Module):
         x = F.elu(self.fc1(x))
         x = F.elu(self.fc2(x))
         action_mean = self.fc_mean(x)
-        action_std = torch.exp(self.fc_log_std(x))
+        action_std = torch.exp(self.fc_log_std(x))  # to be always positive number
         return action_mean.squeeze(), action_std.squeeze()
 
 
