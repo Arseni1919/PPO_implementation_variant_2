@@ -2,6 +2,14 @@ from GLOBALS import *
 from alg_env_wrapper import SingleAgentEnv
 
 
+def get_action(net, observation):
+    action_mean, action_std = net(observation)
+    action_dist = torch.distributions.Normal(action_mean, action_std)
+    action = action_dist.sample()
+    clipped_action = torch.clamp(action, min=-1, max=1)
+    return clipped_action
+
+
 def load_and_play(env_to_play, times, path_to_load_model):
     # Example runs
     model = torch.load(path_to_load_model)
@@ -16,8 +24,8 @@ def play(env, times: int = 1, model: nn.Module = None, max_steps=-1):
     step = 0
     while game < times:
         if model:
-            action = model(state)
-            # print(action.item())
+            # action = model(state)
+            action = get_action(model, state)
         else:
             action = env.action_space.sample()
         next_state, reward, done, _ = env.step(action)

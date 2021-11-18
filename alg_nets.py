@@ -18,7 +18,8 @@ class ActorNet(nn.Module):
         self.head_log_std = nn.Linear(64, n_actions)  # to be always positive number
         init.xavier_normal_(self.fc1.weight)
         init.xavier_normal_(self.fc2.weight)
-        init.xavier_normal_(self.fc3.weight)
+        init.xavier_normal_(self.head_mean.weight)
+        init.xavier_normal_(self.head_log_std.weight)
 
         self.body_net = nn.Sequential(
             self.fc1,

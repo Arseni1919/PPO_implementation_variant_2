@@ -4,7 +4,7 @@ from alg_plotter import ALGPlotter
 from alg_env_wrapper import SingleAgentEnv
 from alg_nets import *
 from alg_replay_buffer import ReplayBuffer
-from play import load_and_play, play
+from play import load_and_play, play, get_action
 from alg_functions import *
 
 
@@ -24,13 +24,17 @@ def train():
             minibatch.append(trajectory)
 
         # COMPUTE REWARDS-TO-GO
-        rewards_to_go, critic_values, advantages = [], [], []
+        rewards_to_go, critic_values, advantages, observations, actions = [], [], [], [], []
         for traj in minibatch:
-            observations, actions, rewards, dones, new_observations = zip(*traj)
-            i_rewards_to_go = compute_rewards_to_go(rewards)
+            i_observations, i_actions, i_rewards, i_dones, i_new_observations = zip(*traj)
+            i_rewards_to_go = compute_rewards_to_go(i_rewards)
             rewards_to_go.append(i_rewards_to_go)
-            i_critic_values = [critic(observation, action).detach() for observation, action in zip(observations, actions)]
+            i_critic_values = [critic(observation, action).detach() for observation, action in zip(i_observations, i_actions)]
             critic_values.append(i_critic_values)
+            i_observations = torch.stack(i_observations).squeeze()
+            observations.append(i_observations)
+            i_actions = torch.stack(i_actions).squeeze()
+            actions.append(i_actions)
 
             # COMPUTE ADVANTAGES
             i_rewards_to_go = torch.stack(i_rewards_to_go).squeeze()
@@ -38,14 +42,34 @@ def train():
             i_advantages = i_rewards_to_go - i_critic_values
             advantages.append(i_advantages)
 
-        # CONCATENATE ALL ADVANTAGES
+        # CONCATENATE ALL
         advantages = torch.cat(advantages)
+        observations = torch.cat(observations)
+        actions = torch.cat(actions)
 
         # UPDATE ACTOR
-        # actor_optim.zero_grad()
-        # actor_loss = - critic(b_observations, actor(b_observations)).mean()
-        # actor_loss.backward()
-        # actor_optim.step()
+        mean_old, std_old = actor_old(observations)
+        action_dist_old = torch.distributions.Normal(mean_old.squeeze(), std_old.squeeze())
+        action_log_probs_old = action_dist_old.log_prob(actions)
+
+        mean, std = actor(observations)
+        action_dist = torch.distributions.Normal(mean.squeeze(), std.squeeze())
+        action_log_probs = action_dist.log_prob(actions)
+
+        ratio_of_probs = torch.exp(action_log_probs - action_log_probs_old)
+        surrogate1 = ratio_of_probs * advantages
+        surrogate2 = torch.clamp(ratio_of_probs, 1 - EPSILON, 1 + EPSILON) * advantages
+        loss_actor = - torch.min(surrogate1, surrogate2)
+
+        # ADD ENTROPY TERM
+        actor_dist_entropy = action_dist.entropy()
+        loss_actor = loss_actor - actor_dist_entropy
+        loss_actor = loss_actor.mean()
+
+        actor_optim.zero_grad()
+        loss_actor.backward()
+        # torch.nn.utils.clip_grad_norm(actor.parameters(), 40)
+        actor_optim.step()
 
         # UPDATE CRITIC
         # loss = nn.MSELoss()
@@ -69,8 +93,8 @@ def train():
         # plotter.neptune_plot({'max_diff_actor': np.max(np.abs(mat1 - mat2))})
 
         # RENDER
-        if i_update % 4 == 0:
-            play(env, 1, actor, max_steps=500)
+        if i_update % 4 == 0 and i_update > 0:
+            play(env, 1, actor)
 
     # ---------------------------------------------------------------- #
 
@@ -94,14 +118,6 @@ def compute_rewards_to_go(rewards):
     return Vals
 
 
-def get_action(observation):
-    action_mean, action_std = actor(observation)
-    action_dist = torch.distributions.Normal(action_mean, action_std)
-    action = action_dist.sample()
-    clipped_action = torch.clamp(action, min=-1, max=1)
-    return clipped_action
-
-
 def get_trajectory(p):
     trajectory = []
 
@@ -110,9 +126,9 @@ def get_trajectory(p):
     done = False
 
     while not done:
-        action = get_action(observation)
-        new_observation, reward, done, info = env.step(clipped_action)
-        trajectory.append((observation, clipped_action, reward, done, new_observation))
+        action = get_action(actor, observation)
+        new_observation, reward, done, info = env.step(action)
+        trajectory.append((observation, action, reward, done, new_observation))
         observation = new_observation
 
     return trajectory
