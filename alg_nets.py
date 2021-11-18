@@ -40,7 +40,7 @@ class ActorNet(nn.Module):
         #     state = Variable(torch.from_numpy(state).float().unsqueeze(0))
         state = state.float()
         value = self.body_net(state)
-        action_mean = F.tanh(self.head_mean(value))
+        action_mean = torch.tanh(self.head_mean(value))
         action_std = torch.exp(self.head_log_std(value))
 
         return action_mean, action_std
@@ -56,7 +56,8 @@ class CriticNet(nn.Module):
     def __init__(self, obs_size: int, n_actions: int, n_agents: int = 1):
         super(CriticNet, self).__init__()
         self.fc1 = nn.Linear(obs_size * n_agents, 64)
-        self.fc2 = nn.Linear(64, obs_size * n_agents)
+        # self.fc2 = nn.Linear(64, obs_size * n_agents)
+        self.fc2 = nn.Linear(64, 64)
         self.fc3 = nn.Linear(obs_size * n_agents + n_actions * n_agents, 64)
         self.fc4 = nn.Linear(64, 64)
         self.fc5 = nn.Linear(64, 1)
@@ -73,6 +74,9 @@ class CriticNet(nn.Module):
             # nn.ReLU(),
             self.fc2,
             nn.ELU(),
+            self.fc4,
+            nn.ELU(),
+            self.fc5,
         )
 
         self.out_net = nn.Sequential(
@@ -88,15 +92,15 @@ class CriticNet(nn.Module):
         self.n_agents = n_agents
         self.entropy_term = 0
 
-    def forward(self, state, action):
+    def forward(self, state):
         # if type(state) is not torch.Tensor:
         #     # state = Variable(torch.from_numpy(state).float().unsqueeze(0))
         #     state = Variable(torch.tensor(state, requires_grad=True).float().unsqueeze(0))
         #     action = Variable(torch.tensor(action, requires_grad=True).float().unsqueeze(0))
 
         state = state.float()
-        obs = self.obs_net(state)
-        cat = torch.cat([obs, action], dim=1)
-        value = self.out_net(cat)
+        value = self.obs_net(state)
+        # cat = torch.cat([obs, action], dim=1)
+        # value = self.out_net(cat)
 
         return value

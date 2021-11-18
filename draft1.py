@@ -15,5 +15,8 @@ from torch.distributions import Normal
 # if os.path.exists(file_path):
 #     # removing the file using the os.remove() method
 #     os.remove(file_path)
-listofzeros = [0] * 100
-print(listofzeros)
+# listofzeros = [0] * 100
+# print(listofzeros)
+
+a = torch.ones(5)
+print(a * 123)

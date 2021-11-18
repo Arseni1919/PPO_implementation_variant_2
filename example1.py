@@ -2,7 +2,7 @@ from alg_plotter import ALGPlotter
 from alg_functions import *
 
 ENV_NAME = 'MountainCarContinuous-v0'
-plotter = ALGPlotter(plot_life=False, plot_neptune=False, name='example_run', tags=[ENV_NAME])
+plotter = ALGPlotter(plot_life=False, plot_neptune=False, name='example_run_ppo', tags=[ENV_NAME])
 
 import argparse
 import gym
@@ -209,7 +209,7 @@ def main():
             advantages = (advantages - advantages.mean()) / advantages.std()
 
             advantages = torch.tensor(advantages).float()
-            action_batch = torch.tensor(action_batch).float()
+            action_batch = torch.tensreturnsor(action_batch).float()
             returns = torch.tensor(returns).float()
 
         # using discounted reward as target q-value to update critic

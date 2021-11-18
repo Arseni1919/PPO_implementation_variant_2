@@ -19,17 +19,18 @@ def train():
 
         # COLLECT SET OF TRAJECTORIES
         for i_episode in range(N_EPISODES_PER_UPDATE):
-            print(f'\r(episode {i_episode + 1})', end='' if i_episode != N_EPISODES_PER_UPDATE - 1 else '\n')
-            trajectory = get_trajectory(p)
+            trajectory, episode_score = get_trajectory(p)
             minibatch.append(trajectory)
+            print(f'\r(episode {i_episode + 1}), episode score: {episode_score}', end='' if i_episode != N_EPISODES_PER_UPDATE - 1 else '\n')
 
         # COMPUTE REWARDS-TO-GO
         rewards_to_go, critic_values, advantages, observations, actions = [], [], [], [], []
         for traj in minibatch:
             i_observations, i_actions, i_rewards, i_dones, i_new_observations = zip(*traj)
             i_rewards_to_go = compute_rewards_to_go(i_rewards)
+            i_rewards_to_go = torch.stack(i_rewards_to_go).squeeze()
             rewards_to_go.append(i_rewards_to_go)
-            i_critic_values = [critic(observation, action).detach() for observation, action in zip(i_observations, i_actions)]
+            i_critic_values = [critic(observation).detach() for observation, action in zip(i_observations, i_actions)]
             critic_values.append(i_critic_values)
             i_observations = torch.stack(i_observations).squeeze()
             observations.append(i_observations)
@@ -37,20 +38,22 @@ def train():
             actions.append(i_actions)
 
             # COMPUTE ADVANTAGES
-            i_rewards_to_go = torch.stack(i_rewards_to_go).squeeze()
             i_critic_values = torch.stack(i_critic_values).squeeze()
+            # i_critic_values = torch.ones_like(i_rewards_to_go) * i_rewards_to_go.mean().item()
+            # i_advantages = i_rewards_to_go
             i_advantages = i_rewards_to_go - i_critic_values
             advantages.append(i_advantages)
 
         # CONCATENATE ALL
-        advantages = torch.cat(advantages)
-        observations = torch.cat(observations)
-        actions = torch.cat(actions)
+        advantages = torch.cat(advantages).detach()
+        observations = torch.cat(observations).detach()
+        actions = torch.cat(actions).detach()
+        rewards_to_go = torch.cat(rewards_to_go).detach()
 
         # UPDATE ACTOR
         mean_old, std_old = actor_old(observations)
         action_dist_old = torch.distributions.Normal(mean_old.squeeze(), std_old.squeeze())
-        action_log_probs_old = action_dist_old.log_prob(actions)
+        action_log_probs_old = action_dist_old.log_prob(actions).detach()
 
         mean, std = actor(observations)
         action_dist = torch.distributions.Normal(mean.squeeze(), std.squeeze())
@@ -59,42 +62,54 @@ def train():
         ratio_of_probs = torch.exp(action_log_probs - action_log_probs_old)
         surrogate1 = ratio_of_probs * advantages
         surrogate2 = torch.clamp(ratio_of_probs, 1 - EPSILON, 1 + EPSILON) * advantages
-        loss_actor = - torch.min(surrogate1, surrogate2)
+        loss_actor = torch.min(surrogate1, surrogate2)
 
         # ADD ENTROPY TERM
-        actor_dist_entropy = action_dist.entropy()
+        actor_dist_entropy = action_dist.entropy().detach()
         loss_actor = loss_actor - actor_dist_entropy
-        loss_actor = loss_actor.mean()
+        loss_actor = - loss_actor.mean()
 
         actor_optim.zero_grad()
         loss_actor.backward()
-        # torch.nn.utils.clip_grad_norm(actor.parameters(), 40)
+        actor_list_of_grad = [torch.max(torch.abs(param.grad)).item() for param in actor.parameters()]
+        torch.nn.utils.clip_grad_norm_(actor.parameters(), 40)
         actor_optim.step()
 
         # UPDATE CRITIC
-        # loss = nn.MSELoss()
-        # critic_optim.zero_grad()
+        critic_values = critic(observations).squeeze()
+        loss_critic = nn.MSELoss()(critic_values, rewards_to_go)
+
+        critic_optim.zero_grad()
         # critic_loss_input = critic(state=b_observations, action=b_actions).squeeze()
         # critic_loss = F.mse_loss(critic_loss_input, y)
-        # critic_loss.backward()
-        # critic_optim.step()
+        loss_critic.backward()
+        critic_optim.step()
 
         # UPDATE OLD NET
         actor_old.load_state_dict(actor.state_dict())
 
         # PLOTTER
-        # plotter.neptune_plot({'loss_critic': critic_loss.item(), 'loss_actor': actor_loss.item()})
+        plotter.neptune_plot({'actor_dist_entropy_mean': actor_dist_entropy.mean().item()})
+        plotter.neptune_plot({'actor_mean': mean.mean().item(), 'actor_std': std.mean().item()})
+        plotter.neptune_plot({'loss_actor': loss_actor.item()})
+        plotter.neptune_plot({'loss_critic': loss_critic.item()})
+        plotter.neptune_plot({'actor_max_grad': max(actor_list_of_grad)})
+        # plotter.neptune_plot({'loss_critic': loss_critic.item()})
         # mse_critic = matrix_mse_mats(plotter.matrix_get_prev('critic'), matrix_get(critic))
         # plotter.neptune_plot({'mse_critic': mse_critic})
-        # mat1 = plotter.matrix_get_prev('actor')
-        # mat2 = matrix_get(actor)
-        # mse_actor = matrix_mse_mats(mat1, mat2)
-        # plotter.neptune_plot({'mse_actor': mse_actor})
+        mat1 = plotter.matrix_get_prev('actor')
+        mat2 = matrix_get(actor)
+        mse_actor = matrix_mse_mats(mat1, mat2)
+        plotter.neptune_plot({'mse_actor': mse_actor})
         # plotter.neptune_plot({'max_diff_actor': np.max(np.abs(mat1 - mat2))})
+
+        plotter.matrix_update('critic', critic)
+        plotter.matrix_update('actor', actor)
 
         # RENDER
         if i_update % 4 == 0 and i_update > 0:
-            play(env, 1, actor)
+            # play(env, 1, actor)
+            pass
 
     # ---------------------------------------------------------------- #
 
@@ -102,11 +117,6 @@ def train():
     plotter.close()
     env.close()
     plotter.info('Finished train.')
-
-
-def compute_critic_values(observations):
-    i_critic_values = [critic(observation) for observation in observations]
-    return i_critic_values
 
 
 def compute_rewards_to_go(rewards):
@@ -124,14 +134,19 @@ def get_trajectory(p):
     # FIRST OBSERVATION
     observation = env.reset()
     done = False
+    episode_score = 0
 
     while not done:
         action = get_action(actor, observation)
+        plotter.neptune_plot({"action": action.item()})
         new_observation, reward, done, info = env.step(action)
         trajectory.append((observation, action, reward, done, new_observation))
         observation = new_observation
+        episode_score += reward.item()
 
-    return trajectory
+    plotter.neptune_plot({"episode_score": episode_score})
+
+    return trajectory, episode_score
 
 
 def save_results(model_to_save, name):
@@ -146,7 +161,8 @@ def save_results(model_to_save, name):
 
 if __name__ == '__main__':
     # --------------------------- # PLOTTER & ENV # -------------------------- #
-    plotter = ALGPlotter(plot_life=PLOT_LIVE, plot_neptune=NEPTUNE, name='my_run', tags=[ENV_NAME])
+    plotter = ALGPlotter(plot_life=PLOT_LIVE, plot_neptune=NEPTUNE, name='my_run_ppo',
+                         tags=["PPO", "clip_grad_norm", "b(s) = 0", ENV_NAME])
     env = SingleAgentEnv(env_name=ENV_NAME, plotter=plotter)
 
     # --------------------------- # NETS # -------------------------- #
