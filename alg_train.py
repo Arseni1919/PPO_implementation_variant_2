@@ -4,7 +4,7 @@ from alg_plotter import ALGPlotter
 from alg_env_wrapper import SingleAgentEnv
 from alg_nets import *
 from alg_replay_buffer import ReplayBuffer
-from play import load_and_play, play, get_action
+from alg_play import load_and_play, play, get_action
 from alg_functions import *
 
 
@@ -86,7 +86,8 @@ def train():
         critic_optim.step()
 
         # UPDATE OLD NET
-        actor_old.load_state_dict(actor.state_dict())
+        if i_update % 4 == 0:
+            actor_old.load_state_dict(actor.state_dict())
 
         # PLOTTER
         plotter.neptune_plot({'actor_dist_entropy_mean': actor_dist_entropy.mean().item()})
@@ -108,7 +109,7 @@ def train():
 
         # RENDER
         if i_update % 4 == 0 and i_update > 0:
-            # play(env, 1, actor)
+            play(env, 1, actor)
             pass
 
     # ---------------------------------------------------------------- #

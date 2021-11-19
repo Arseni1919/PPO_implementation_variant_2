@@ -1,7 +1,7 @@
 import gym.spaces
 import torch
 
-from GLOBALS import *
+from alg_GLOBALS import *
 
 # from alg_plotter import plotter
 

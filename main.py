@@ -4,7 +4,7 @@ from alg_plotter import ALGPlotter
 from alg_env_wrapper import SingleAgentEnv
 from alg_nets import *
 from alg_replay_buffer import ReplayBuffer
-from play import play
+from alg_play import play
 from alg_functions import *
 torch.autograd.set_detect_anomaly(True)
 

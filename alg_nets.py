@@ -1,6 +1,6 @@
 import torch
 
-from GLOBALS import *
+from alg_GLOBALS import *
 
 
 class ActorNet(nn.Module):

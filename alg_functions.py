@@ -1,6 +1,6 @@
 import numpy as np
 
-from GLOBALS import *
+from alg_GLOBALS import *
 
 
 def moving_average(x, w):

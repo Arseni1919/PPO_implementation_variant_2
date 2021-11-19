@@ -1,4 +1,4 @@
-from GLOBALS import *
+from alg_GLOBALS import *
 from alg_env_wrapper import SingleAgentEnv
 
 
