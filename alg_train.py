@@ -8,6 +8,14 @@ from alg_play import load_and_play, play, get_action
 from alg_functions import *
 
 
+def get_train_action(net, observation):
+    action_mean, action_std = net(observation)
+    action_dist = torch.distributions.Normal(action_mean, action_std)
+    action = action_dist.sample()
+    clipped_action = torch.clamp(action, min=-1, max=1)
+    return clipped_action
+
+
 def train():
     plotter.info('Training...')
 
@@ -67,57 +75,90 @@ def train():
         # ADD ENTROPY TERM
         actor_dist_entropy = action_dist.entropy().detach()
         loss_actor = loss_actor - actor_dist_entropy
-        loss_actor = - loss_actor.mean()
 
+        loss_actor = - loss_actor.mean()
         actor_optim.zero_grad()
         loss_actor.backward()
-        actor_list_of_grad = [torch.max(torch.abs(param.grad)).item() for param in actor.parameters()]
+        # actor_list_of_grad = [torch.max(torch.abs(param.grad)).item() for param in actor.parameters()]
         torch.nn.utils.clip_grad_norm_(actor.parameters(), 40)
         actor_optim.step()
 
         # UPDATE CRITIC
         critic_values = critic(observations).squeeze()
         loss_critic = nn.MSELoss()(critic_values, rewards_to_go)
-
         critic_optim.zero_grad()
-        # critic_loss_input = critic(state=b_observations, action=b_actions).squeeze()
-        # critic_loss = F.mse_loss(critic_loss_input, y)
         loss_critic.backward()
         critic_optim.step()
 
         # UPDATE OLD NET
-        if i_update % 4 == 0:
+        if i_update % 5 == 0:
             actor_old.load_state_dict(actor.state_dict())
 
         # PLOTTER
-        plotter.neptune_plot({'actor_dist_entropy_mean': actor_dist_entropy.mean().item()})
-        plotter.neptune_plot({'actor_mean': mean.mean().item(), 'actor_std': std.mean().item()})
-        plotter.neptune_plot({'loss_actor': loss_actor.item()})
-        plotter.neptune_plot({'loss_critic': loss_critic.item()})
-        plotter.neptune_plot({'actor_max_grad': max(actor_list_of_grad)})
+        # plotter.neptune_plot({'actor_dist_entropy_mean': actor_dist_entropy.mean().item()})
+        # plotter.neptune_plot({'actor_mean': mean.mean().item(), 'actor_std': std.mean().item()})
+        # plotter.neptune_plot({'loss_actor': loss_actor.item()})
         # plotter.neptune_plot({'loss_critic': loss_critic.item()})
-        # mse_critic = matrix_mse_mats(plotter.matrix_get_prev('critic'), matrix_get(critic))
-        # plotter.neptune_plot({'mse_critic': mse_critic})
-        mat1 = plotter.matrix_get_prev('actor')
-        mat2 = matrix_get(actor)
-        mse_actor = matrix_mse_mats(mat1, mat2)
-        plotter.neptune_plot({'mse_actor': mse_actor})
-        # plotter.neptune_plot({'max_diff_actor': np.max(np.abs(mat1 - mat2))})
+        # plotter.neptune_plot({'actor_max_grad': max(actor_list_of_grad)})
+        # mat1 = plotter.matrix_get_prev('actor')
+        # mat2 = matrix_get(actor)
+        # mse_actor = matrix_mse_mats(mat1, mat2)
+        # plotter.neptune_plot({'mse_actor': mse_actor})
 
         plotter.matrix_update('critic', critic)
         plotter.matrix_update('actor', actor)
 
         # RENDER
         if i_update % 4 == 0 and i_update > 0:
-            play(env, 1, actor)
+            # play(env, 1, actor)
             pass
+        # mean, std, loss_actor = [], [], []
+        plot_graphs(mean, std, loss_actor, loss_critic, i_update, actions, observations, critic_values)
 
     # ---------------------------------------------------------------- #
 
     # FINISH TRAINING
     plotter.close()
+    plt.close()
     env.close()
     plotter.info('Finished train.')
+
+
+def plot_graphs(actor_mean, actor_std, loss, loss_critic, i, actor_output_tensor, input_values_tensor, critic_output_tensor):
+    # PLOT
+    mean_list.append(actor_output_tensor.mean().detach().squeeze().item())
+    mean_list.append(actor_mean.mean().detach().squeeze().item())
+    std_list.append(actor_std.mean().detach().squeeze().item())
+    loss_list_actor.append(loss.item())
+    loss_list_critic.append(loss_critic.item())
+
+    if i % 2 == 0:
+        # AX 1
+        ax_1.cla()
+        input_values_np = input_values_tensor.squeeze().numpy()
+        x = input_values_np[:, 0]
+        y = input_values_np[:, 1]
+
+        # actor_output_tensor_np = actor_output_tensor.detach().squeeze().numpy()
+        # ax_1.scatter(x, y, actor_output_tensor_np, marker='.', label='actions')
+        critic_output_tensor_np = critic_output_tensor.detach().squeeze().numpy()
+        ax_1.scatter(x, y, critic_output_tensor_np, marker='.', alpha=0.1, label='critic values')
+        ax_1.legend()
+
+        # AX 2
+        ax_2.cla()
+        ax_2.plot(mean_list, label='mean')
+        ax_2.plot(std_list, label='std')
+        ax_2.legend()
+
+        # AX 3
+        ax_3.cla()
+        ax_3.plot(loss_list_actor, label='actor')
+        ax_3.plot(loss_list_critic, label='critic')
+        ax_3.set_title('Loss')
+        ax_3.legend()
+
+        plt.pause(0.05)
 
 
 def compute_rewards_to_go(rewards):
@@ -138,7 +179,7 @@ def get_trajectory(p):
     episode_score = 0
 
     while not done:
-        action = get_action(actor, observation)
+        action = get_train_action(actor_old, observation)
         plotter.neptune_plot({"action": action.item()})
         new_observation, reward, done, info = env.step(action)
         trajectory.append((observation, action, reward, done, new_observation))
@@ -190,6 +231,13 @@ if __name__ == '__main__':
     plotter.neptune_set_parameters()
     plotter.matrix_update('critic', critic)
     plotter.matrix_update('actor', actor)
+    fig = plt.figure(figsize=plt.figaspect(.5))
+    fig.suptitle('MountainCar')
+    ax_1 = fig.add_subplot(1, 3, 1, projection='3d')
+    ax_2 = fig.add_subplot(1, 3, 2)
+    ax_3 = fig.add_subplot(1, 3, 3)
+
+    mean_list, std_list, loss_list_actor, loss_list_critic = [], [], [], []
 
     # ---------------------------------------------------------------- #
     # ---------------------------------------------------------------- #

@@ -14,11 +14,11 @@ class ActorNet(nn.Module):
         super(ActorNet, self).__init__()
         self.fc1 = nn.Linear(obs_size, 64)
         self.fc2 = nn.Linear(64, 526)
-        self.fc2_2 = nn.Linear(526, 1024)
-        self.fc2_3 = nn.Linear(1024, 1024)
-        self.fc2_4 = nn.Linear(1024, 526)
+        self.fc2_2 = nn.Linear(526, 526)
+        self.fc2_3 = nn.Linear(526, 526)
+        self.fc2_4 = nn.Linear(526, 526)
         self.fc3 = nn.Linear(526, 64)
-        self.fc4 = nn.Linear(64, 1)
+        # self.fc4 = nn.Linear(64, 1)
         self.head_mean = nn.Linear(64, n_actions)
         self.head_log_std = nn.Linear(64, n_actions)  # to be always positive number
         init.xavier_normal_(self.fc1.weight)
@@ -27,7 +27,7 @@ class ActorNet(nn.Module):
         init.xavier_normal_(self.fc2_3.weight)
         init.xavier_normal_(self.fc2_4.weight)
         init.xavier_normal_(self.fc3.weight)
-        init.xavier_normal_(self.fc4.weight)
+        # init.xavier_normal_(self.fc4.weight)
         init.xavier_normal_(self.head_mean.weight)
         init.xavier_normal_(self.head_log_std.weight)
 
@@ -44,8 +44,8 @@ class ActorNet(nn.Module):
             nn.ELU(),
             self.fc3,
             nn.ELU(),
-            self.fc4,
-            nn.ELU(),
+            # self.fc4,
+            # nn.ELU(),
             # self.fc3,
             # nn.Tanh(),
             # # nn.Sigmoid(),
@@ -60,11 +60,10 @@ class ActorNet(nn.Module):
         #     state = Variable(torch.from_numpy(state).float().unsqueeze(0))
         state = state.float()
         value = self.body_net(state)
-        # action_mean = torch.tanh(self.head_mean(value))
-        # action_std = torch.exp(self.head_log_std(value))
-
-        # return action_mean, action_std
-        return value
+        action_mean = self.head_mean(value)
+        action_std = torch.exp(self.head_log_std(value))
+        return action_mean, action_std
+        # return value
 
 
 class CriticNet(nn.Module):
@@ -78,9 +77,9 @@ class CriticNet(nn.Module):
         super(CriticNet, self).__init__()
         self.fc1 = nn.Linear(obs_size * n_agents, 64)
         # self.fc2 = nn.Linear(64, obs_size * n_agents)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(obs_size * n_agents + n_actions * n_agents, 64)
-        self.fc4 = nn.Linear(64, 64)
+        self.fc2 = nn.Linear(64, 526)
+        self.fc3 = nn.Linear(526, 526)
+        self.fc4 = nn.Linear(526, 64)
         self.fc5 = nn.Linear(64, 1)
         init.xavier_normal_(self.fc1.weight)
         init.xavier_normal_(self.fc2.weight)
@@ -95,18 +94,20 @@ class CriticNet(nn.Module):
             # nn.ReLU(),
             self.fc2,
             nn.ELU(),
-            self.fc4,
-            nn.ELU(),
-            self.fc5,
-        )
-
-        self.out_net = nn.Sequential(
             self.fc3,
             nn.ELU(),
             self.fc4,
             nn.ELU(),
             self.fc5,
         )
+
+        # self.out_net = nn.Sequential(
+        #     self.fc3,
+        #     nn.ELU(),
+        #     self.fc4,
+        #     nn.ELU(),
+        #     self.fc5,
+        # )
 
         self.n_actions = n_actions
         self.obs_size = obs_size

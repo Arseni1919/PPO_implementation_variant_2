@@ -11,6 +11,10 @@
 
 ![](static/Figure_1.png)
 
+### Model with mean and std
+
+![](static/Figure_2.png)
+
 # !!! What was important:
 
 
