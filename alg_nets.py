@@ -21,15 +21,15 @@ class ActorNet(nn.Module):
         # self.fc4 = nn.Linear(64, 1)
         self.head_mean = nn.Linear(64, n_actions)
         self.head_log_std = nn.Linear(64, n_actions)  # to be always positive number
-        init.xavier_normal_(self.fc1.weight)
-        init.xavier_normal_(self.fc2.weight)
-        init.xavier_normal_(self.fc2_2.weight)
-        init.xavier_normal_(self.fc2_3.weight)
-        init.xavier_normal_(self.fc2_4.weight)
-        init.xavier_normal_(self.fc3.weight)
-        # init.xavier_normal_(self.fc4.weight)
-        init.xavier_normal_(self.head_mean.weight)
-        init.xavier_normal_(self.head_log_std.weight)
+        # init.xavier_normal_(self.fc1.weight)
+        # init.xavier_normal_(self.fc2.weight)
+        # init.xavier_normal_(self.fc2_2.weight)
+        # init.xavier_normal_(self.fc2_3.weight)
+        # init.xavier_normal_(self.fc2_4.weight)
+        # init.xavier_normal_(self.fc3.weight)
+        # # init.xavier_normal_(self.fc4.weight)
+        # init.xavier_normal_(self.head_mean.weight)
+        # init.xavier_normal_(self.head_log_std.weight)
 
         self.body_net = nn.Sequential(
             self.fc1,
@@ -81,11 +81,11 @@ class CriticNet(nn.Module):
         self.fc3 = nn.Linear(526, 526)
         self.fc4 = nn.Linear(526, 64)
         self.fc5 = nn.Linear(64, 1)
-        init.xavier_normal_(self.fc1.weight)
-        init.xavier_normal_(self.fc2.weight)
-        init.xavier_normal_(self.fc3.weight)
-        init.xavier_normal_(self.fc4.weight)
-        init.xavier_normal_(self.fc5.weight)
+        # init.xavier_normal_(self.fc1.weight)
+        # init.xavier_normal_(self.fc2.weight)
+        # init.xavier_normal_(self.fc3.weight)
+        # init.xavier_normal_(self.fc4.weight)
+        # init.xavier_normal_(self.fc5.weight)
 
         self.obs_net = nn.Sequential(
             self.fc1,
