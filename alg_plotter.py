@@ -78,8 +78,8 @@ class ALGPlotter:
                 if cla:
                     ax[indx_r, indx_c].cla()
                 ax[indx_r, indx_c].plot(list(range(len(list_of_values))), list_of_values, c=color)  # , edgecolor='b')
-                # ax[indx_r, indx_c].set_title(f'Plot: {label}')
-                # ax[indx_r, indx_c].set_xlabel('iters')
+                # ax_1[indx_r, indx_c].set_title(f'Plot: {label}')
+                # ax_1[indx_r, indx_c].set_xlabel('iters')
                 ax[indx_r, indx_c].set_ylabel(f'{label}')
                 ax[indx_r, indx_c].axhline(0, color='gray')
 
@@ -106,9 +106,9 @@ class ALGPlotter:
                 if cla:
                     ax.cla()
                 im = ax.imshow(values, cmap='hot', interpolation='nearest')
-                # ax[indx_r, indx_c].set_title(f'Plot: {label}')
-                # ax[indx_r, indx_c].set_xlabel('iters')
-                # divider = make_axes_locatable(ax)
+                # ax_1[indx_r, indx_c].set_title(f'Plot: {label}')
+                # ax_1[indx_r, indx_c].set_xlabel('iters')
+                # divider = make_axes_locatable(ax_1)
                 # cax = divider.append_axes("right", size="5%", pad=0.05)
                 # plt.colorbar(im, cax=cax)
                 ax.set_ylabel(f'{label}')

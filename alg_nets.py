@@ -13,11 +13,21 @@ class ActorNet(nn.Module):
     def __init__(self, obs_size: int, n_actions: int):
         super(ActorNet, self).__init__()
         self.fc1 = nn.Linear(obs_size, 64)
-        self.fc2 = nn.Linear(64, 64)
+        self.fc2 = nn.Linear(64, 526)
+        self.fc2_2 = nn.Linear(526, 1024)
+        self.fc2_3 = nn.Linear(1024, 1024)
+        self.fc2_4 = nn.Linear(1024, 526)
+        self.fc3 = nn.Linear(526, 64)
+        self.fc4 = nn.Linear(64, 1)
         self.head_mean = nn.Linear(64, n_actions)
         self.head_log_std = nn.Linear(64, n_actions)  # to be always positive number
         init.xavier_normal_(self.fc1.weight)
         init.xavier_normal_(self.fc2.weight)
+        init.xavier_normal_(self.fc2_2.weight)
+        init.xavier_normal_(self.fc2_3.weight)
+        init.xavier_normal_(self.fc2_4.weight)
+        init.xavier_normal_(self.fc3.weight)
+        init.xavier_normal_(self.fc4.weight)
         init.xavier_normal_(self.head_mean.weight)
         init.xavier_normal_(self.head_log_std.weight)
 
@@ -25,6 +35,16 @@ class ActorNet(nn.Module):
             self.fc1,
             nn.ELU(),
             self.fc2,
+            nn.ELU(),
+            self.fc2_2,
+            nn.ELU(),
+            self.fc2_3,
+            nn.ELU(),
+            self.fc2_4,
+            nn.ELU(),
+            self.fc3,
+            nn.ELU(),
+            self.fc4,
             nn.ELU(),
             # self.fc3,
             # nn.Tanh(),
@@ -40,10 +60,11 @@ class ActorNet(nn.Module):
         #     state = Variable(torch.from_numpy(state).float().unsqueeze(0))
         state = state.float()
         value = self.body_net(state)
-        action_mean = torch.tanh(self.head_mean(value))
-        action_std = torch.exp(self.head_log_std(value))
+        # action_mean = torch.tanh(self.head_mean(value))
+        # action_std = torch.exp(self.head_log_std(value))
 
-        return action_mean, action_std
+        # return action_mean, action_std
+        return value
 
 
 class CriticNet(nn.Module):

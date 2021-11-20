@@ -4,6 +4,13 @@
 
 ![ddpg](static/ppo_pseudocode.png)
 
+
+## Analysis 
+
+### Different sizes of NN
+
+![](static/Figure_1.png)
+
 # !!! What was important:
 
 
