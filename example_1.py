@@ -50,13 +50,6 @@ class Actor(nn.Module):
         return action_mean.squeeze(), action_std.squeeze()
 
 
-def get_action(state):
-    action_mean, action_std = actor(state)
-    action_dist = torch.distributions.Normal(action_mean, action_std)
-    action = action_dist.sample()
-    return action.item()
-
-
 def synchronize_actors():
     for target_param, param in zip(actor_old.parameters(), actor.parameters()):
         target_param.data.copy_(param.data)
@@ -74,19 +67,19 @@ def update_actor(state, action, advantage):
     # update old actor before update current actor
     synchronize_actors()
 
-    r_theta = torch.exp(action_log_probs - action_log_probs_old)
-    surrogate1 = r_theta * advantage
-    surrogate2 = torch.clamp(r_theta, 1.0 - cfg.clip_epsilon, 1.0 + cfg.clip_epsilon) * advantage
-    loss = -torch.min(surrogate1, surrogate2).mean()
+    ratio_of_probs = torch.exp(action_log_probs - action_log_probs_old)
+    surrogate1 = ratio_of_probs * advantage
+    surrogate2 = torch.clamp(ratio_of_probs, 1.0 - cfg.clip_epsilon, 1.0 + cfg.clip_epsilon) * advantage
+    loss = - torch.min(surrogate1, surrogate2).mean()
 
     entropy = action_dist.entropy()
-    loss = torch.mean(loss - 1e-2 * entropy)
+    loss_after_entropy = torch.mean(loss - 1e-2 * entropy)
 
     actor_optimizer.zero_grad()
-    loss.backward()
+    loss_after_entropy.backward()
     torch.nn.utils.clip_grad_norm_(actor.parameters(), 40)
     actor_optimizer.step()
-    return loss.item()
+    return loss_after_entropy.item()
 
 
 class Critic(nn.Module):
@@ -123,19 +116,26 @@ def main():
         memory = []
 
         with torch.no_grad():
+
+            # GATHER BATCH
             while len(memory) < cfg.batch_size:  # 10000 batch_size
                 episode += 1
                 state = env.reset()
-                # state_stat.update(state)
-                # state = np.clip((state - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)  # ?
+                state_stat.update(state)
+                state = np.clip((state - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)  # ?
 
                 # ONE EPISODE
                 for s in range(1000):
-                    action = get_action(torch.tensor(state).float()[None, :])
+                    action_mean, action_std = actor(torch.tensor(state).float()[None, :])
+                    action_dist = torch.distributions.Normal(action_mean, action_std)
+                    action = action_dist.sample()
+                    action = action.item()
+                    # if action > 1:
+                    #     print(action)
                     next_state, reward, done, _ = env.step([action])
 
-                    # state_stat.update(next_state)
-                    # next_state = np.clip((next_state - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
+                    state_stat.update(next_state)
+                    next_state = np.clip((next_state - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
                     memory.append([state, action, reward, next_state, done])
 
                     state = next_state
@@ -151,6 +151,7 @@ def main():
             state_batch = torch.tensor(state_batch).float()
             values = critic(state_batch).detach().cpu().numpy()
 
+            # CALCULATE ADVANTAGES
             returns = np.zeros(action_batch.shape)
             deltas = np.zeros(action_batch.shape)
             advantages = np.zeros(action_batch.shape)
@@ -242,15 +243,9 @@ def plot_graphs(actor_mean, actor_std, loss_actor, loss_critic, i, actor_output_
         plt.pause(0.05)
 
 
-def draw_fig():
-    plt.title('reward')
-    plt.plot(last_score_plot, '-')
-    plt.plot(avg_score_plot, 'r-')
-
-
 if __name__ == '__main__':
     ENV_NAME = 'MountainCarContinuous-v0'
-    PLOT_PER = 4
+    PLOT_PER = 2
     max_episode = 70
     last_score_plot = [-100]
     avg_score_plot = [-100]
@@ -274,7 +269,7 @@ if __name__ == '__main__':
 
     # FOR PLOTS
     fig = plt.figure(figsize=plt.figaspect(.5))
-    fig.suptitle('MountainCar')
+    fig.suptitle('Example Run')
     ax_1 = fig.add_subplot(1, 4, 1, projection='3d')
     ax_2 = fig.add_subplot(1, 4, 2)
     ax_3 = fig.add_subplot(1, 4, 3)
@@ -286,3 +281,16 @@ if __name__ == '__main__':
     plt.close()
 
     play(env, 10, actor)
+
+
+# def get_action(state):
+#     action_mean, action_std = actor(state)
+#     action_dist = torch.distributions.Normal(action_mean, action_std)
+#     action = action_dist.sample()
+#     return action.item()
+#
+#
+# def draw_fig():
+#     plt.title('reward')
+#     plt.plot(last_score_plot, '-')
+#     plt.plot(avg_score_plot, 'r-')

@@ -5,11 +5,11 @@ from alg_env_wrapper import SingleAgentEnv
 
 
 def get_action(net, observation):
-    action_mean, action_std = net(torch.tensor(observation))
+    action_mean, action_std = net(observation)
     action_dist = torch.distributions.Normal(action_mean, action_std)
     action = action_dist.sample()
-    clipped_action = torch.clamp(action, min=-1, max=1)
-    return [clipped_action]
+    # clipped_action = torch.clamp(action, min=-1, max=1)
+    return action
 
 
 def load_and_play(env_to_play, times, path_to_load_model):

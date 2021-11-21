@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 
 from alg_plotter import ALGPlotter
@@ -12,90 +13,55 @@ def get_train_action(net, observation):
     action_mean, action_std = net(observation)
     action_dist = torch.distributions.Normal(action_mean, action_std)
     action = action_dist.sample()
-    clipped_action = torch.clamp(action, min=-1, max=1)
-    return clipped_action
+    # clipped_action = torch.clamp(action, min=-1, max=1)
+    return action
 
 
 def train():
     plotter.info('Training...')
-    scores = []
-    avg_scores = []
+    total_scores, total_avg_scores = [0], [0]
     # --------------------------- # MAIN LOOP # -------------------------- #
     for i_update in range(N_UPDATES):
         plotter.info(f'Update {i_update + 1}')
-        minibatch = []
-        p = i_update / N_UPDATES
 
-        # COLLECT SET OF TRAJECTORIES
-        for i_episode in range(N_EPISODES_PER_UPDATE):
-            trajectory, episode_score = get_trajectory(p)
-            minibatch.append(trajectory)
-            scores.append(episode_score)
-            avg_scores.append(scores[-1] * 0.99 + episode_score * 0.01)
-            print(f'\r(episode {i_episode + 1}), episode score: {episode_score}', end='' if i_episode != N_EPISODES_PER_UPDATE - 1 else '\n')
-
+        states, actions, rewards, dones, next_states = get_trajectories(total_scores, total_avg_scores)
+        states_tensor = torch.tensor(states).float()
+        actions_tensor = torch.tensor(actions).float()
         # COMPUTE REWARDS-TO-GO
-        rewards_to_go, advantages, observations, actions = [], [], [], []
-        for traj in minibatch:
-            i_observations, i_actions, i_rewards, i_dones, i_new_observations = zip(*traj)
-            i_rewards_to_go = compute_rewards_to_go(i_rewards)
-            i_rewards_to_go = torch.stack(i_rewards_to_go).squeeze()
-            rewards_to_go.append(i_rewards_to_go)
-            i_critic_values = [critic(observation).detach() for observation, action in zip(i_observations, i_actions)]
-            i_observations = torch.stack(i_observations).squeeze()
-            observations.append(i_observations)
-            i_actions = torch.stack(i_actions).squeeze()
-            actions.append(i_actions)
+        critic_values_tensor = critic(states_tensor).detach().squeeze()
+        critic_values = critic_values_tensor.numpy()
+        returns = np.zeros(rewards.shape)
+        deltas = np.zeros(rewards.shape)
+        advantages = np.zeros(rewards.shape)
 
-            # COMPUTE ADVANTAGES
-            i_critic_values = torch.stack(i_critic_values).squeeze()
-            # i_critic_values = torch.ones_like(i_rewards_to_go) * i_rewards_to_go.mean().item()
-            # i_advantages = i_rewards_to_go
-            i_advantages = i_rewards_to_go - i_critic_values
-            advantages.append(i_advantages)
+        prev_return, prev_value, prev_advantage = 0, 0, 0
+        for i in reversed(range(rewards.shape[0])):
+            final_state_bool = 1 - dones[i]
 
-        # CONCATENATE ALL
-        advantages = torch.cat(advantages).detach()
-        observations = torch.cat(observations).detach()
-        actions = torch.cat(actions).detach()
-        rewards_to_go = torch.cat(rewards_to_go).detach()
+            returns[i] = rewards[i] + GAMMA * prev_return * final_state_bool
+            prev_return = returns[i]
+
+            deltas[i] = rewards[i] + GAMMA * prev_value * final_state_bool - critic_values[i]
+            prev_value = critic_values[i]
+
+            advantages[i] = deltas[i] + GAMMA * LAMBDA * prev_advantage * final_state_bool
+            prev_advantage = advantages[i]
+
+        advantages = (advantages - advantages.mean()) / advantages.std()
+        advantages_tensor = torch.tensor(advantages).float()
+        returns_tensor = torch.tensor(returns).float()
 
         # UPDATE ACTOR
-        mean_old, std_old = actor_old(observations)
-        action_dist_old = torch.distributions.Normal(mean_old.squeeze(), std_old.squeeze())
-        action_log_probs_old = action_dist_old.log_prob(actions).detach()
-
-        mean, std = actor(observations)
-        action_dist = torch.distributions.Normal(mean.squeeze(), std.squeeze())
-        action_log_probs = action_dist.log_prob(actions)
-
-        ratio_of_probs = torch.exp(action_log_probs - action_log_probs_old)
-        surrogate1 = ratio_of_probs * advantages
-        surrogate2 = torch.clamp(ratio_of_probs, 1 - EPSILON, 1 + EPSILON) * advantages
-        loss_actor = torch.min(surrogate1, surrogate2)
-
-        # ADD ENTROPY TERM
-        actor_dist_entropy = action_dist.entropy().detach()
-        loss_actor = loss_actor - 1e-2 * actor_dist_entropy
-
-        loss_actor = - loss_actor.mean()
-        actor_optim.zero_grad()
-        loss_actor.backward()
-        # actor_list_of_grad = [torch.max(torch.abs(param.grad)).item() for param in actor.parameters()]
-        torch.nn.utils.clip_grad_norm_(actor.parameters(), 10)
-        actor_optim.step()
+        # mean, std, loss_actor = update_actor(states_tensor, actions_tensor, returns_tensor)
+        mean, std, loss_actor = update_actor(states_tensor, actions_tensor, advantages_tensor)
 
         # UPDATE CRITIC
-        critic_values = critic(observations).squeeze()
-        loss_critic = nn.MSELoss()(critic_values, rewards_to_go)
+        critic_values_tensor = critic(states_tensor).squeeze()
+        loss_critic = nn.MSELoss()(critic_values_tensor, returns_tensor)
         critic_optim.zero_grad()
         loss_critic.backward()
         critic_optim.step()
 
-        # UPDATE OLD NET
-        soft_update(actor_old, actor, TAU)
-        # if i_update % 5 == 0:
-        #     actor_old.load_state_dict(actor.state_dict())
 
         # PLOTTER
         # plotter.neptune_plot({'actor_dist_entropy_mean': actor_dist_entropy.mean().item()})
@@ -107,16 +73,18 @@ def train():
         # mat2 = matrix_get(actor)
         # mse_actor = matrix_mse_mats(mat1, mat2)
         # plotter.neptune_plot({'mse_actor': mse_actor})
-
-        plotter.matrix_update('critic', critic)
-        plotter.matrix_update('actor', actor)
+        # plotter.matrix_update('critic', critic)
+        # plotter.matrix_update('actor', actor)
 
         # RENDER
         if i_update % 4 == 0 and i_update > 0:
             # play(env, 1, actor)
             pass
         # mean, std, loss_actor = [], [], []
-        plot_graphs(mean, std, loss_actor, loss_critic, i_update, actions, observations, critic_values, scores, avg_scores)
+        plot_graphs(
+            mean, std, loss_actor, loss_critic, i_update, actions_tensor, states_tensor, critic_values_tensor,
+            total_scores, total_avg_scores
+        )
 
     # ---------------------------------------------------------------- #
 
@@ -127,6 +95,42 @@ def train():
     plotter.info('Finished train.')
 
 
+def update_actor(states_tensor, actions_tensor, advantages_tensor):
+    # UPDATE ACTOR
+    mean_old, std_old = actor_old(states_tensor)
+    action_dist_old = torch.distributions.Normal(mean_old.squeeze(), std_old.squeeze())
+    action_log_probs_old = action_dist_old.log_prob(actions_tensor).detach()
+
+    mean, std = actor(states_tensor)
+    action_dist = torch.distributions.Normal(mean.squeeze(), std.squeeze())
+    action_log_probs = action_dist.log_prob(actions_tensor)
+
+    # UPDATE OLD NET
+    for target_param, param in zip(actor_old.parameters(), actor.parameters()):
+        target_param.data.copy_(param.data)
+    # soft_update(actor_old, actor, TAU)
+    # if i_update % 5 == 0:
+    #     actor_old.load_state_dict(actor.state_dict())
+
+    ratio_of_probs = torch.exp(action_log_probs - action_log_probs_old)
+    surrogate1 = ratio_of_probs * advantages_tensor
+    surrogate2 = torch.clamp(ratio_of_probs, 1 - EPSILON, 1 + EPSILON) * advantages_tensor
+    loss_actor = - torch.min(surrogate1, surrogate2)
+
+    # ADD ENTROPY TERM
+    actor_dist_entropy = action_dist.entropy()
+    loss_actor = torch.mean(loss_actor - 1e-2 * actor_dist_entropy)
+    # loss_actor = loss_actor - 1e-2 * actor_dist_entropy
+
+    actor_optim.zero_grad()
+    loss_actor.backward()
+    # actor_list_of_grad = [torch.max(torch.abs(param.grad)).item() for param in actor.parameters()]
+    torch.nn.utils.clip_grad_norm_(actor.parameters(), 40)
+    actor_optim.step()
+
+    return mean, std, loss_actor
+
+
 def soft_update(target, source, tau):
     # for target_param, param in zip(target_critic.parameters(), critic.parameters()):
     #     target_param.data.copy_(POLYAK * target_param.data + (1.0 - POLYAK) * param.data)
@@ -134,7 +138,9 @@ def soft_update(target, source, tau):
         target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
 
 
-def plot_graphs(actor_mean, actor_std, loss, loss_critic, i, actor_output_tensor, observations_tensor, critic_output_tensor, scores, avg_scores):
+def plot_graphs(actor_mean, actor_std, loss, loss_critic, i,
+                actor_output_tensor, observations_tensor, critic_output_tensor,
+                scores, avg_scores):
     # PLOT
     # mean_list.append(actor_output_tensor.mean().detach().squeeze().item())
     mean_list.append(actor_mean.mean().detach().squeeze().item())
@@ -142,7 +148,7 @@ def plot_graphs(actor_mean, actor_std, loss, loss_critic, i, actor_output_tensor
     loss_list_actor.append(loss.item())
     loss_list_critic.append(loss_critic.item())
 
-    if i % 2 == 0:
+    if i % PLOT_PER == 0:
         # AX 1
         ax_1.cla()
         input_values_np = observations_tensor.squeeze().numpy()
@@ -175,6 +181,7 @@ def plot_graphs(actor_mean, actor_std, loss, loss_critic, i, actor_output_tensor
         ax_4.plot(scores, label='scores')
         ax_4.plot(avg_scores, label='avg scores')
         ax_4.set_title('Scores')
+        ax_4.legend()
 
         plt.pause(0.05)
 
@@ -188,25 +195,45 @@ def compute_rewards_to_go(rewards):
     return Vals
 
 
-def get_trajectory(p):
-    trajectory = []
+def get_trajectories(scores, scores_avg):
 
-    # FIRST OBSERVATION
-    observation = env.reset()
-    done = False
-    episode_score = 0
+    states, actions, rewards, dones, next_states = [], [], [], [], []
 
-    while not done:
-        action = get_train_action(actor_old, observation)
-        plotter.neptune_plot({"action": action.item()})
-        new_observation, reward, done, info = env.step(action)
-        trajectory.append((observation, action, reward, done, new_observation))
-        observation = new_observation
-        episode_score += reward.item()
+    finish_to_collect = False
+    i_episode = 0
 
-    plotter.neptune_plot({"episode_score": episode_score})
+    while not finish_to_collect:
+        state = env.reset()
+        done = False
+        episode_score = 0
 
-    return trajectory, episode_score
+        while not done:
+            action = get_train_action(actor_old, state)
+            plotter.neptune_plot({"action": action.item()})
+            next_state, reward, done, info = env.step(action)
+            states.append(state.detach().squeeze().numpy())
+            actions.append(action.item())
+            rewards.append(reward.item())
+            dones.append(done.item())
+            next_states.append(next_state.detach().squeeze().numpy())
+
+            state = next_state
+            i_episode += 1
+            episode_score += reward.item()
+            finish_to_collect = True if len(rewards) > BATCH_SIZE else False
+
+        scores.append(episode_score)
+        scores_avg.append(scores_avg[-1] * 0.9 + episode_score * 0.1)
+        plotter.neptune_plot({"episode_score": episode_score})
+        print(f'\r(episode {i_episode + 1}, step {len(rewards)}), episode score: {episode_score}')
+
+    states = np.array(states)
+    actions = np.array(actions)
+    rewards = np.array(rewards)
+    dones = np.array(dones)
+    next_states = np.array(next_states)
+
+    return states, actions, rewards, dones, next_states
 
 
 def save_results(model_to_save, name):
@@ -221,6 +248,7 @@ def save_results(model_to_save, name):
 
 if __name__ == '__main__':
     # --------------------------- # PLOTTER & ENV # -------------------------- #
+    PLOT_PER = 2
     plotter = ALGPlotter(plot_life=PLOT_LIVE, plot_neptune=NEPTUNE, name='my_run_ppo',
                          tags=["PPO", "clip_grad_norm", "b(s) = 0", ENV_NAME])
     env = SingleAgentEnv(env_name=ENV_NAME, plotter=plotter)
@@ -229,7 +257,6 @@ if __name__ == '__main__':
     critic = CriticNet(obs_size=env.observation_size(), n_actions=env.action_size())
     actor = ActorNet(obs_size=env.observation_size(), n_actions=env.action_size())
     actor_old = ActorNet(obs_size=env.observation_size(), n_actions=env.action_size())
-    actor_old.load_state_dict(actor.state_dict())
 
     # --------------------------- # OPTIMIZERS # -------------------------- #
     critic_optim = torch.optim.Adam(critic.parameters(), lr=LR_CRITIC)
@@ -250,7 +277,7 @@ if __name__ == '__main__':
     plotter.matrix_update('critic', critic)
     plotter.matrix_update('actor', actor)
     fig = plt.figure(figsize=plt.figaspect(.5))
-    fig.suptitle('MountainCar')
+    fig.suptitle('My Run')
     ax_1 = fig.add_subplot(1, 4, 1, projection='3d')
     ax_2 = fig.add_subplot(1, 4, 2)
     ax_3 = fig.add_subplot(1, 4, 3)
