@@ -1,9 +1,5 @@
 from alg_plotter import ALGPlotter
 from alg_functions import *
-
-ENV_NAME = 'MountainCarContinuous-v0'
-plotter = ALGPlotter(plot_life=False, plot_neptune=False, name='example_run_ppo', tags=[ENV_NAME])
-
 import argparse
 import gym
 import time
@@ -16,31 +12,10 @@ import torch.optim as optim
 
 from drawnow import drawnow
 import matplotlib.pyplot as plt
-
-last_score_plot = [-100]
-avg_score_plot = [-100]
+from alg_play import play
 
 
-def draw_fig():
-    plt.title('reward')
-    plt.plot(last_score_plot, '-')
-    plt.plot(avg_score_plot, 'r-')
-
-
-parser = argparse.ArgumentParser(description='PyTorch PPO solution of MountainCarContinuous-v0')
-parser.add_argument('--gamma', type=float, default=0.99)
-parser.add_argument('--actor_lr', type=float, default=1e-3)
-parser.add_argument('--critic_lr', type=float, default=1e-3)
-parser.add_argument('--clip_epsilon', type=float, default=0.2)
-parser.add_argument('--gae_lambda', type=float, default=0.97)
-parser.add_argument('--batch_size', type=int, default=10000)
-parser.add_argument('--max_episode', type=int, default=100)
-cfg = parser.parse_args()
-
-env = gym.make(ENV_NAME)
-
-
-class running_state:
+class RunningState:
     def __init__(self, state):
         self.len = 1
         self.running_mean = state
@@ -109,9 +84,9 @@ def update_actor(state, action, advantage):
 
     actor_optimizer.zero_grad()
     loss.backward()
-    torch.nn.utils.clip_grad_norm(actor.parameters(), 40)
+    torch.nn.utils.clip_grad_norm_(actor.parameters(), 40)
     actor_optimizer.step()
-    return
+    return loss.item()
 
 
 class Critic(nn.Module):
@@ -128,50 +103,39 @@ class Critic(nn.Module):
         return value.squeeze()
 
 
-def get_state_value(state):
-    state_value = critic(state)
-    return state_value
-
-
 def update_critic(state, target):
     state_value = critic(state)
     loss = F.mse_loss(state_value, target)
     critic_optimizer.zero_grad()
     loss.backward()
     critic_optimizer.step()
-    return
-
-
-actor = Actor()
-actor_old = Actor()
-critic = Critic()
-actor_optimizer = optim.Adam(actor.parameters(), lr=cfg.actor_lr)
-critic_optimizer = optim.Adam(critic.parameters(), lr=cfg.critic_lr)
+    return loss.item()
 
 
 def main():
     state = env.reset()
-    state_stat = running_state(state)
+    state_stat = RunningState(state)
 
-    for i in range(cfg.max_episode):
+    for j in range(max_episode):
         start_time = time.perf_counter()
         episode_score = 0
         episode = 0
         memory = []
 
         with torch.no_grad():
-            while len(memory) < cfg.batch_size:
+            while len(memory) < cfg.batch_size:  # 10000 batch_size
                 episode += 1
                 state = env.reset()
-                state_stat.update(state)
-                state = np.clip((state - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
+                # state_stat.update(state)
+                # state = np.clip((state - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)  # ?
 
+                # ONE EPISODE
                 for s in range(1000):
                     action = get_action(torch.tensor(state).float()[None, :])
                     next_state, reward, done, _ = env.step([action])
 
-                    state_stat.update(next_state)
-                    next_state = np.clip((next_state - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
+                    # state_stat.update(next_state)
+                    # next_state = np.clip((next_state - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
                     memory.append([state, action, reward, next_state, done])
 
                     state = next_state
@@ -180,14 +144,12 @@ def main():
                     if done:
                         break
 
-            state_batch, \
-            action_batch, \
-            reward_batch, \
-            next_state_batch, \
-            done_batch = map(lambda x: np.array(x).astype(np.float32), zip(*memory))
+            state_batch, action_batch, reward_batch, next_state_batch, done_batch = map(
+                lambda x: np.array(x).astype(np.float32), zip(*memory)
+            )
 
             state_batch = torch.tensor(state_batch).float()
-            values = get_state_value(state_batch).detach().cpu().numpy()
+            values = critic(state_batch).detach().cpu().numpy()
 
             returns = np.zeros(action_batch.shape)
             deltas = np.zeros(action_batch.shape)
@@ -209,24 +171,118 @@ def main():
             advantages = (advantages - advantages.mean()) / advantages.std()
 
             advantages = torch.tensor(advantages).float()
-            action_batch = torch.tensreturnsor(action_batch).float()
+            action_batch = torch.tensor(action_batch).float()
             returns = torch.tensor(returns).float()
 
         # using discounted reward as target q-value to update critic
-        update_critic(state_batch, returns)
+        loss_critic = update_critic(state_batch, returns)
 
-        update_actor(state_batch, action_batch, advantages)
+        loss_actor = update_actor(state_batch, action_batch, advantages)
+        # loss_actor = update_actor(state_batch, action_batch, returns)
+        # loss_actor = update_actor(state_batch, action_batch, torch.ones(returns.shape))
 
+
+        # PLOT
         episode_score /= episode
-        print('last_score {:5f}, steps {}, ({:2f} sec/eps)'.
-              format(episode_score, len(memory), time.perf_counter() - start_time))
+        print(f'last_score {episode_score:5f}, steps {len(memory)}, ({time.perf_counter() - start_time:2f} sec/eps)')
         avg_score_plot.append(avg_score_plot[-1] * 0.99 + episode_score * 0.01)
         last_score_plot.append(episode_score)
-        drawnow(draw_fig)
+        # drawnow(draw_fig)
+        with torch.no_grad():
+            actor_mean, actor_std = actor(state_batch)
+            critic_output_tensor = critic(state_batch)
+            plot_graphs(actor_mean, actor_std, loss_actor, loss_critic, j, action_batch, state_batch,
+                        critic_output_tensor, last_score_plot, avg_score_plot)
 
     env.close()
 
 
+def plot_graphs(actor_mean, actor_std, loss_actor, loss_critic, i, actor_output_tensor, observations_tensor, critic_output_tensor, scores, avg_scores):
+    # PLOT
+    # mean_list.append(actor_output_tensor.mean().detach().squeeze().item())
+    mean_list.append(actor_mean.mean().detach().squeeze().item())
+    std_list.append(actor_std.mean().detach().squeeze().item())
+    loss_list_actor.append(loss_actor)
+    loss_list_critic.append(loss_critic)
+
+    if i % PLOT_PER == 0:
+        # AX 1
+        ax_1.cla()
+        input_values_np = observations_tensor.squeeze().numpy()
+        x = input_values_np[:, 0]
+        y = input_values_np[:, 1]
+
+        actor_output_tensor_np = actor_output_tensor.detach().squeeze().numpy()
+        ax_1.scatter(x, y, actor_output_tensor_np, marker='.', alpha=0.1, label='actions')
+        # critic_output_tensor_np = critic_output_tensor.detach().squeeze().numpy()
+        # ax_1.scatter(x, y, critic_output_tensor_np, marker='.', alpha=0.1, label='critic values')
+        ax_1.set_title('Outputs of NN')
+        ax_1.legend()
+
+        # AX 2
+        ax_2.cla()
+        ax_2.plot(mean_list, label='mean')
+        ax_2.plot(std_list, label='std')
+        ax_2.set_title('Mean & STD')
+        ax_2.legend()
+
+        # AX 3
+        ax_3.cla()
+        ax_3.plot(loss_list_actor, label='actor')
+        ax_3.plot(loss_list_critic, label='critic')
+        ax_3.set_title('Loss')
+        ax_3.legend()
+
+        # AX 4
+        ax_4.cla()
+        ax_4.plot(scores, label='scores')
+        ax_4.plot(avg_scores, label='avg scores')
+        ax_4.set_title('Scores')
+
+        plt.pause(0.05)
+
+
+def draw_fig():
+    plt.title('reward')
+    plt.plot(last_score_plot, '-')
+    plt.plot(avg_score_plot, 'r-')
+
+
 if __name__ == '__main__':
+    ENV_NAME = 'MountainCarContinuous-v0'
+    PLOT_PER = 4
+    max_episode = 70
+    last_score_plot = [-100]
+    avg_score_plot = [-100]
+
+    parser = argparse.ArgumentParser(description='PyTorch PPO solution of MountainCarContinuous-v0')
+    parser.add_argument('--gamma', type=float, default=0.99)
+    parser.add_argument('--actor_lr', type=float, default=1e-3)
+    parser.add_argument('--critic_lr', type=float, default=1e-3)
+    parser.add_argument('--clip_epsilon', type=float, default=0.2)
+    parser.add_argument('--gae_lambda', type=float, default=0.97)
+    parser.add_argument('--batch_size', type=int, default=10000)
+    cfg = parser.parse_args()
+
+    env = gym.make(ENV_NAME)
+
+    actor = Actor()
+    actor_old = Actor()
+    critic = Critic()
+    actor_optimizer = optim.Adam(actor.parameters(), lr=cfg.actor_lr)
+    critic_optimizer = optim.Adam(critic.parameters(), lr=cfg.critic_lr)
+
+    # FOR PLOTS
+    fig = plt.figure(figsize=plt.figaspect(.5))
+    fig.suptitle('MountainCar')
+    ax_1 = fig.add_subplot(1, 4, 1, projection='3d')
+    ax_2 = fig.add_subplot(1, 4, 2)
+    ax_3 = fig.add_subplot(1, 4, 3)
+    ax_4 = fig.add_subplot(1, 4, 4)
+    mean_list, std_list, loss_list_actor, loss_list_critic = [], [], [], []
+
     main()
-    plt.pause(0)
+    # plt.pause(0)
+    plt.close()
+
+    play(env, 10, actor)

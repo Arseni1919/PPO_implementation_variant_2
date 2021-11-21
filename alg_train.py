@@ -19,7 +19,7 @@ def get_train_action(net, observation):
 def train():
     plotter.info('Training...')
     scores = []
-
+    avg_scores = []
     # --------------------------- # MAIN LOOP # -------------------------- #
     for i_update in range(N_UPDATES):
         plotter.info(f'Update {i_update + 1}')
@@ -31,6 +31,7 @@ def train():
             trajectory, episode_score = get_trajectory(p)
             minibatch.append(trajectory)
             scores.append(episode_score)
+            avg_scores.append(scores[-1] * 0.99 + episode_score * 0.01)
             print(f'\r(episode {i_episode + 1}), episode score: {episode_score}', end='' if i_episode != N_EPISODES_PER_UPDATE - 1 else '\n')
 
         # COMPUTE REWARDS-TO-GO
@@ -75,13 +76,13 @@ def train():
 
         # ADD ENTROPY TERM
         actor_dist_entropy = action_dist.entropy().detach()
-        loss_actor = loss_actor - actor_dist_entropy
+        loss_actor = loss_actor - 1e-2 * actor_dist_entropy
 
         loss_actor = - loss_actor.mean()
         actor_optim.zero_grad()
         loss_actor.backward()
         # actor_list_of_grad = [torch.max(torch.abs(param.grad)).item() for param in actor.parameters()]
-        torch.nn.utils.clip_grad_norm_(actor.parameters(), 40)
+        torch.nn.utils.clip_grad_norm_(actor.parameters(), 10)
         actor_optim.step()
 
         # UPDATE CRITIC
@@ -115,7 +116,7 @@ def train():
             # play(env, 1, actor)
             pass
         # mean, std, loss_actor = [], [], []
-        plot_graphs(mean, std, loss_actor, loss_critic, i_update, actions, observations, critic_values, scores)
+        plot_graphs(mean, std, loss_actor, loss_critic, i_update, actions, observations, critic_values, scores, avg_scores)
 
     # ---------------------------------------------------------------- #
 
@@ -133,9 +134,9 @@ def soft_update(target, source, tau):
         target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
 
 
-def plot_graphs(actor_mean, actor_std, loss, loss_critic, i, actor_output_tensor, input_values_tensor, critic_output_tensor, scores):
+def plot_graphs(actor_mean, actor_std, loss, loss_critic, i, actor_output_tensor, observations_tensor, critic_output_tensor, scores, avg_scores):
     # PLOT
-    mean_list.append(actor_output_tensor.mean().detach().squeeze().item())
+    # mean_list.append(actor_output_tensor.mean().detach().squeeze().item())
     mean_list.append(actor_mean.mean().detach().squeeze().item())
     std_list.append(actor_std.mean().detach().squeeze().item())
     loss_list_actor.append(loss.item())
@@ -144,22 +145,22 @@ def plot_graphs(actor_mean, actor_std, loss, loss_critic, i, actor_output_tensor
     if i % 2 == 0:
         # AX 1
         ax_1.cla()
-        input_values_np = input_values_tensor.squeeze().numpy()
+        input_values_np = observations_tensor.squeeze().numpy()
         x = input_values_np[:, 0]
         y = input_values_np[:, 1]
 
         actor_output_tensor_np = actor_output_tensor.detach().squeeze().numpy()
         ax_1.scatter(x, y, actor_output_tensor_np, marker='.', label='actions')
-        critic_output_tensor_np = critic_output_tensor.detach().squeeze().numpy()
-        ax_1.scatter(x, y, critic_output_tensor_np, marker='.', alpha=0.1, label='critic values')
-        ax_3.set_title('Outputs of NN')
+        # critic_output_tensor_np = critic_output_tensor.detach().squeeze().numpy()
+        # ax_1.scatter(x, y, critic_output_tensor_np, marker='.', alpha=0.1, label='critic values')
+        ax_1.set_title('Outputs of NN')
         ax_1.legend()
 
         # AX 2
         ax_2.cla()
         ax_2.plot(mean_list, label='mean')
         ax_2.plot(std_list, label='std')
-        ax_3.set_title('Mean & STD')
+        ax_2.set_title('Mean & STD')
         ax_2.legend()
 
         # AX 3
@@ -172,6 +173,7 @@ def plot_graphs(actor_mean, actor_std, loss, loss_critic, i, actor_output_tensor
         # AX 4
         ax_4.cla()
         ax_4.plot(scores, label='scores')
+        ax_4.plot(avg_scores, label='avg scores')
         ax_4.set_title('Scores')
 
         plt.pause(0.05)

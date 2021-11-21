@@ -18,5 +18,5 @@ from torch.distributions import Normal
 # listofzeros = [0] * 100
 # print(listofzeros)
 
-a = torch.ones(5)
-print(a * 123)
+# a = torch.ones(5)
+print([...])
