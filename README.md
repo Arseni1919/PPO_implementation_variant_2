@@ -19,12 +19,11 @@
 
 Item | my run | [example 1](https://github.com/zzzxxxttt/pytorch_simple_RL/blob/master/ppo_mtcar.py) | [example 2](https://github.com/Abhipanda4/PPO-PyTorch) |
  --- | --- | --- | ---
-| NN | --- | --- | --- |
- --- | --- | --- | ---
-| batch size | --- | --- | --- |
-| GAMMA | --- | --- | --- |
-| LAMBDA | --- | --- | --- |
-| ALPHA | --- | --- | --- |
+NN | --- | --- | ---
+batch size | --- | --- | --- |
+GAMMA | --- | --- | --- |
+LAMBDA | --- | --- | --- |
+ALPHA | --- | --- | --- |
  --- | --- | --- | ---
 
 
