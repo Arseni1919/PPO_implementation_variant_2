@@ -27,63 +27,30 @@ def train():
         states, actions, rewards, dones, next_states = get_trajectories(total_scores, total_avg_scores)
         states_tensor = torch.tensor(states).float()
         actions_tensor = torch.tensor(actions).float()
-        # COMPUTE REWARDS-TO-GO
         critic_values_tensor = critic(states_tensor).detach().squeeze()
         critic_values = critic_values_tensor.numpy()
-        returns = np.zeros(rewards.shape)
-        deltas = np.zeros(rewards.shape)
-        advantages = np.zeros(rewards.shape)
 
-        prev_return, prev_value, prev_advantage = 0, 0, 0
-        for i in reversed(range(rewards.shape[0])):
-            final_state_bool = 1 - dones[i]
-
-            returns[i] = rewards[i] + GAMMA * prev_return * final_state_bool
-            prev_return = returns[i]
-
-            deltas[i] = rewards[i] + GAMMA * prev_value * final_state_bool - critic_values[i]
-            prev_value = critic_values[i]
-
-            advantages[i] = deltas[i] + GAMMA * LAMBDA * prev_advantage * final_state_bool
-            prev_advantage = advantages[i]
-
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-4)
-        advantages_tensor = torch.tensor(advantages).float()
-        returns_tensor = torch.tensor(returns).float()
+        # COMPUTE REWARDS-TO-GO
+        returns_tensor, advantages_tensor = compute_returns_and_advantages(rewards, dones, critic_values)
 
         # UPDATE ACTOR
         # mean, std, loss_actor = update_actor(states_tensor, actions_tensor, returns_tensor)
         mean, std, loss_actor = update_actor(states_tensor, actions_tensor, advantages_tensor)
 
         # UPDATE CRITIC
-        critic_values_tensor = critic(states_tensor).squeeze()
-        loss_critic = nn.MSELoss()(critic_values_tensor, returns_tensor)
-        critic_optim.zero_grad()
-        loss_critic.backward()
-        critic_optim.step()
+        loss_critic = update_critic(states_tensor, returns_tensor)
 
         # PLOTTER
-        # plotter.neptune_plot({'actor_dist_entropy_mean': actor_dist_entropy.mean().item()})
-        # plotter.neptune_plot({'actor_mean': mean.mean().item(), 'actor_std': std.mean().item()})
-        # plotter.neptune_plot({'loss_actor': loss_actor.item()})
-        # plotter.neptune_plot({'loss_critic': loss_critic.item()})
-        # plotter.neptune_plot({'actor_max_grad': max(actor_list_of_grad)})
-        # mat1 = plotter.matrix_get_prev('actor')
-        # mat2 = matrix_get(actor)
-        # mse_actor = matrix_mse_mats(mat1, mat2)
-        # plotter.neptune_plot({'mse_actor': mse_actor})
-        # plotter.matrix_update('critic', critic)
-        # plotter.matrix_update('actor', actor)
+        plot_neptune()
+        plot_graphs(
+            mean, std, loss_actor, loss_critic, i_update, actions_tensor, states_tensor, critic_values_tensor,
+            total_scores, total_avg_scores
+        )
 
         # RENDER
         if i_update % 4 == 0 and i_update > 0:
             # play(env, 1, actor)
             pass
-        # mean, std, loss_actor = [], [], []
-        plot_graphs(
-            mean, std, loss_actor, loss_critic, i_update, actions_tensor, states_tensor, critic_values_tensor,
-            total_scores, total_avg_scores
-        )
 
     # ---------------------------------------------------------------- #
 
@@ -92,6 +59,40 @@ def train():
     plt.close()
     env.close()
     plotter.info('Finished train.')
+
+
+def compute_returns_and_advantages(rewards, dones, critic_values):
+    returns = np.zeros(rewards.shape)
+    deltas = np.zeros(rewards.shape)
+    advantages = np.zeros(rewards.shape)
+
+    prev_return, prev_value, prev_advantage = 0, 0, 0
+    for i in reversed(range(rewards.shape[0])):
+        final_state_bool = 1 - dones[i]
+
+        returns[i] = rewards[i] + GAMMA * prev_return * final_state_bool
+        prev_return = returns[i]
+
+        deltas[i] = rewards[i] + GAMMA * prev_value * final_state_bool - critic_values[i]
+        prev_value = critic_values[i]
+
+        advantages[i] = deltas[i] + GAMMA * LAMBDA * prev_advantage * final_state_bool
+        prev_advantage = advantages[i]
+
+    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-4)
+    advantages_tensor = torch.tensor(advantages).float()
+    returns_tensor = torch.tensor(returns).float()
+
+    return returns_tensor, advantages_tensor
+
+
+def update_critic(states_tensor, returns_tensor):
+    critic_values_tensor = critic(states_tensor).squeeze()
+    loss_critic = nn.MSELoss()(critic_values_tensor, returns_tensor)
+    critic_optim.zero_grad()
+    loss_critic.backward()
+    critic_optim.step()
+    return loss_critic
 
 
 def update_actor(states_tensor, actions_tensor, advantages_tensor):
@@ -135,6 +136,21 @@ def soft_update(target, source, tau):
     #     target_param.data.copy_(POLYAK * target_param.data + (1.0 - POLYAK) * param.data)
     for target_param, param in zip(target.parameters(), source.parameters()):
         target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
+
+
+def plot_neptune():
+    # plotter.neptune_plot({'actor_dist_entropy_mean': actor_dist_entropy.mean().item()})
+    # plotter.neptune_plot({'actor_mean': mean.mean().item(), 'actor_std': std.mean().item()})
+    # plotter.neptune_plot({'loss_actor': loss_actor.item()})
+    # plotter.neptune_plot({'loss_critic': loss_critic.item()})
+    # plotter.neptune_plot({'actor_max_grad': max(actor_list_of_grad)})
+    # mat1 = plotter.matrix_get_prev('actor')
+    # mat2 = matrix_get(actor)
+    # mse_actor = matrix_mse_mats(mat1, mat2)
+    # plotter.neptune_plot({'mse_actor': mse_actor})
+    # plotter.matrix_update('critic', critic)
+    # plotter.matrix_update('actor', actor)
+    pass
 
 
 def plot_graphs(actor_mean, actor_std, loss, loss_critic, i,

@@ -19,7 +19,11 @@
 
 Item | my run | [example 1](https://github.com/zzzxxxttt/pytorch_simple_RL/blob/master/ppo_mtcar.py) | [example 2](https://github.com/Abhipanda4/PPO-PyTorch) |
  ---                    | --- | --- | --- |
-NN                      | --- | --- | --- |
+NN                                      | --- | --- | --- |
+Sample trajectories                     | --- | --- | --- |
+Calculate returns and advantages        | --- | --- | --- |
+Critic update                           | --- | --- | --- |
+Actor update                            | --- | --- | --- |
 batch size              | --- | --- | --- |
 GAMMA                   | --- | --- | --- |
 EPSILON                 | --- | --- | --- |
