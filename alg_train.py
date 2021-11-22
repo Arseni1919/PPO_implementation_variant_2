@@ -20,12 +20,13 @@ def get_train_action(net, observation):
 def train():
     plotter.info('Training...')
     total_scores, total_avg_scores = [0], [0]
+    state_stat = running_state(env.reset().detach().squeeze().numpy())
     # --------------------------- # MAIN LOOP # -------------------------- #
     for i_update in range(N_UPDATES):
         plotter.info(f'Update {i_update + 1}')
 
         # SAMPLE TRAJECTORIES
-        states, actions, rewards, dones, next_states = get_trajectories(total_scores, total_avg_scores)
+        states, actions, rewards, dones, next_states = get_trajectories(total_scores, total_avg_scores, state_stat)
         states_tensor = torch.tensor(states).float()
         actions_tensor = torch.tensor(actions).float()
         critic_values_tensor = critic(states_tensor).detach().squeeze()
@@ -203,7 +204,7 @@ def plot_graphs(actor_mean, actor_std, loss, loss_critic, i,
         plt.pause(0.05)
 
 
-def get_trajectories(scores, scores_avg):
+def get_trajectories(scores, scores_avg, state_stat):
 
     states, actions, rewards, dones, next_states = [], [], [], [], []
 
@@ -212,6 +213,12 @@ def get_trajectories(scores, scores_avg):
 
     while not len(rewards) > BATCH_SIZE:
         state = env.reset()
+
+        state_np = state.detach().squeeze().numpy()
+        state_stat.update(state_np)
+        state_np = np.clip((state_np - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
+        state = torch.FloatTensor(state_np)
+
         done = False
         episode_score = 0
         while not done:
@@ -226,12 +233,18 @@ def get_trajectories(scores, scores_avg):
             next_states.append(next_state.detach().squeeze().numpy())
 
             state = next_state
+
+            state_np = state.detach().squeeze().numpy()
+            state_stat.update(state_np)
+            state_np = np.clip((state_np - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
+            state = torch.FloatTensor(state_np)
+
             episode_score += reward.item()
 
         episode_scores.append(episode_score)
         n_episodes += 1
         plotter.neptune_plot({"episode_score": episode_score})
-        print(f'\r(episode {n_episodes + 1}, step {len(rewards)}), episode score: {episode_score}')
+        print(f'\r(episode {n_episodes}, step {len(rewards)}), episode score: {episode_score}')
 
     scores.append(np.mean(episode_scores))
     scores_avg.append(scores_avg[-1] * 0.9 + np.mean(episode_scores) * 0.1)
@@ -242,6 +255,25 @@ def get_trajectories(scores, scores_avg):
     next_states = np.array(next_states)
 
     return states, actions, rewards, dones, next_states
+
+
+class running_state:
+  def __init__(self, state):
+    self.len = 1
+    self.running_mean = state
+    self.running_std = state ** 2
+
+  def update(self, state):
+    self.len += 1
+    old_mean = self.running_mean.copy()
+    self.running_mean[...] = old_mean + (state - old_mean) / self.len
+    self.running_std[...] = self.running_std + (state - old_mean) * (state - self.running_mean)
+
+  def mean(self):
+    return self.running_mean
+
+  def std(self):
+    return np.sqrt(self.running_std / (self.len - 1))
 
 
 def save_results(model_to_save, name):
