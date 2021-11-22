@@ -15,6 +15,18 @@
 
 ![](static/Figure_2.png)
 
+### Things one can compare with other example implementations
+
+Item | my run | example 1 | example 2 |
+NN | --- | --- | --- |
+batch size | --- | --- | --- |
+GAMMA | --- | --- | --- |
+LAMBDA | --- | --- | --- |
+ALPHA | --- | --- | --- |
+--- | --- | --- | --- |
+--- | --- | --- | --- |
+
+
 # !!! What was important:
 
 

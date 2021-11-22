@@ -47,7 +47,7 @@ def train():
             advantages[i] = deltas[i] + GAMMA * LAMBDA * prev_advantage * final_state_bool
             prev_advantage = advantages[i]
 
-        advantages = (advantages - advantages.mean()) / advantages.std()
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-4)
         advantages_tensor = torch.tensor(advantages).float()
         returns_tensor = torch.tensor(returns).float()
 
@@ -61,7 +61,6 @@ def train():
         critic_optim.zero_grad()
         loss_critic.backward()
         critic_optim.step()
-
 
         # PLOTTER
         # plotter.neptune_plot({'actor_dist_entropy_mean': actor_dist_entropy.mean().item()})
