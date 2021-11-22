@@ -24,7 +24,6 @@ batch size | --- | --- | --- |
 GAMMA | --- | --- | --- |
 LAMBDA | --- | --- | --- |
 ALPHA | --- | --- | --- |
- --- | --- | --- | ---
 
 
 # !!! What was important:
