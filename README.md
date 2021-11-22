@@ -17,11 +17,11 @@
 
 ### Things one can compare with other example implementations
 
-Compare: my run, [example 1](https://github.com/zzzxxxttt/pytorch_simple_RL/blob/master/ppo_mtcar.py), [example 2](https://github.com/Abhipanda4/PPO-PyTorch) |
+Compare: my run, [example 1](https://github.com/zzzxxxttt/pytorch_simple_RL/blob/master/ppo_mtcar.py), [example 2](https://github.com/Abhipanda4/PPO-PyTorch)
 
 Component | my run | example 1 | example 2
 --- | --- | --- | ---
-NN                                      | --- | --- | --- |
+NN                                      | --- | --- | 64 |
 Sample trajectories                     | --- | --- | --- |
 Wrap states                             | --- | --- | --- |
 Wrap rewards                            | --- | --- | --- |
@@ -31,14 +31,14 @@ Actor update                            | --- | --- | --- |
 
 Parameter | my run | example 1 | example 2
 --- | --- | --- | ---
-batch size              | --- | --- | --- |
-GAMMA                   | --- | --- | --- |
-EPSILON                 | --- | --- | --- |
-LAMBDA                  | --- | --- | --- |
-ALPHA                   | --- | --- | --- |
-TAU                     | --- | --- | --- |
-Actor LR                | --- | --- | --- |
-Critic LR               | --- | --- | --- |
+n of updates | --- | --- | 300 |
+batch size | --- | --- | 5000 |
+GAMMA (discount rate) | --- | --- | 0.995 |
+EPSILON (clipping ratios) | --- | --- | 0.1 |
+LAMBDA | --- | --- | (as TAU) |
+TAU (for GAE) | --- | --- | 0.97 |
+Actor LR | --- | --- | 0.001 |
+Critic LR | --- | --- | 0.001 |
 
 
 # !!! What was important:
