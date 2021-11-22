@@ -17,8 +17,7 @@
 
 ### Things one can compare with other example implementations
 
-Item | my run | [example 1](https://github.com/zzzxxxttt/pytorch_simple_RL/blob/master/ppo_mtcar.py) | [example 2](https://github.com/Abhipanda4/PPO-PyTorch) |
- ---                    | --- | --- | --- |
+Compare: my run, [example 1](https://github.com/zzzxxxttt/pytorch_simple_RL/blob/master/ppo_mtcar.py), [example 2](https://github.com/Abhipanda4/PPO-PyTorch) |
 
 Component | my run | example 1 | example 2
 --- | --- | --- | ---
