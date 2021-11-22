@@ -21,6 +21,7 @@ Item | my run | [example 1](https://github.com/zzzxxxttt/pytorch_simple_RL/blob/
  ---                    | --- | --- | --- |
 NN                                      | --- | --- | --- |
 Sample trajectories                     | --- | --- | --- |
+Wrap states                             | --- | --- | --- |
 Calculate returns and advantages        | --- | --- | --- |
 Critic update                           | --- | --- | --- |
 Actor update                            | --- | --- | --- |
