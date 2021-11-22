@@ -21,9 +21,11 @@ Item | my run | [example 1](https://github.com/zzzxxxttt/pytorch_simple_RL/blob/
 NN | --- | --- | --- |
 batch size | --- | --- | --- |
 GAMMA | --- | --- | --- |
-
+--- | --- | --- | ---
 LAMBDA | --- | --- | ---
+--- | --- | --- | ---
 GAMMA | --- | --- | ---
+--- | --- | --- | ---
 ALPHA | --- | --- | ---
 --- | --- | --- | ---
 --- | --- | --- | ---
