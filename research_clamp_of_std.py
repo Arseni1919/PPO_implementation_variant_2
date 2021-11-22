@@ -8,7 +8,7 @@ from mpl_toolkits.mplot3d import axes3d
 
 def main():
     mean, std = actor(state_tensor)
-    actor_dist = torch.distributions.Normal(mean, std )
+    actor_dist = torch.distributions.Normal(mean, std)
     prob_1 = torch.exp(actor_dist.log_prob(torch.tensor(1)))
     prob_2 = torch.exp(actor_dist.log_prob(torch.tensor(10)))
 
