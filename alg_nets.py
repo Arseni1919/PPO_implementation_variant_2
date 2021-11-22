@@ -27,7 +27,7 @@ class ActorNet(nn.Module):
         # init.xavier_normal_(self.fc2_3.weight)
         # init.xavier_normal_(self.fc2_4.weight)
         # init.xavier_normal_(self.fc3.weight)
-        # # init.xavier_normal_(self.fc4.weight)
+        # init.xavier_normal_(self.fc4.weight)
         # init.xavier_normal_(self.head_mean.weight)
         # init.xavier_normal_(self.head_log_std.weight)
 

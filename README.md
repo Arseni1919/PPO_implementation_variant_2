@@ -21,13 +21,13 @@ Compare: my run, [example 1](https://github.com/zzzxxxttt/pytorch_simple_RL/blob
 
 Component | my run | example 1 | example 2
 --- | --- | --- | ---
-NN                                      | --- | --- | 64 |
-Sample trajectories                     | --- | --- | --- |
-Wrap states                             | --- | --- | --- |
-Wrap rewards                            | --- | --- | --- |
-Calculate returns and advantages        | --- | --- | --- |
-Critic update                           | --- | --- | --- |
-Actor update                            | --- | --- | --- |
+NN                               | --- | --- | 1 |
+Sample trajectories              | 1 | --- | 1 |
+Wrap states                      | --- | --- | 1 |
+Wrap rewards                     | 1 | --- | 1 |
+Calculate returns and advantages | 1 | --- | 1 |
+Critic update                    | 1 | --- | 1 |
+Actor update                     | 1 | --- | 1 |
 
 Parameter | my run | example 1 | example 2
 --- | --- | --- | ---

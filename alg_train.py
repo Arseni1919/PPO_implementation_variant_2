@@ -24,21 +24,23 @@ def train():
     for i_update in range(N_UPDATES):
         plotter.info(f'Update {i_update + 1}')
 
+        # SAMPLE TRAJECTORIES
         states, actions, rewards, dones, next_states = get_trajectories(total_scores, total_avg_scores)
         states_tensor = torch.tensor(states).float()
         actions_tensor = torch.tensor(actions).float()
         critic_values_tensor = critic(states_tensor).detach().squeeze()
         critic_values = critic_values_tensor.numpy()
 
-        # COMPUTE REWARDS-TO-GO
+        # COMPUTE RETURNS AND ADVANTAGES
         returns_tensor, advantages_tensor = compute_returns_and_advantages(rewards, dones, critic_values)
+
+        # UPDATE CRITIC
+        loss_critic = update_critic(states_tensor, returns_tensor)
 
         # UPDATE ACTOR
         # mean, std, loss_actor = update_actor(states_tensor, actions_tensor, returns_tensor)
         mean, std, loss_actor = update_actor(states_tensor, actions_tensor, advantages_tensor)
 
-        # UPDATE CRITIC
-        loss_critic = update_critic(states_tensor, returns_tensor)
 
         # PLOTTER
         plot_neptune()
@@ -115,11 +117,11 @@ def update_actor(states_tensor, actions_tensor, advantages_tensor):
     ratio_of_probs = torch.exp(action_log_probs - action_log_probs_old)
     surrogate1 = ratio_of_probs * advantages_tensor
     surrogate2 = torch.clamp(ratio_of_probs, 1 - EPSILON, 1 + EPSILON) * advantages_tensor
-    loss_actor = - torch.min(surrogate1, surrogate2)
+    loss_actor = - torch.min(surrogate1, surrogate2).mean()
 
     # ADD ENTROPY TERM
-    actor_dist_entropy = action_dist.entropy()
-    loss_actor = torch.mean(loss_actor - 1e-2 * actor_dist_entropy)
+    # actor_dist_entropy = action_dist.entropy()
+    # loss_actor = torch.mean(loss_actor - 1e-2 * actor_dist_entropy)
     # loss_actor = loss_actor - 1e-2 * actor_dist_entropy
 
     actor_optim.zero_grad()
@@ -171,7 +173,7 @@ def plot_graphs(actor_mean, actor_std, loss, loss_critic, i,
         y = input_values_np[:, 1]
 
         actor_output_tensor_np = actor_output_tensor.detach().squeeze().numpy()
-        ax_1.scatter(x, y, actor_output_tensor_np, marker='.', label='actions')
+        ax_1.scatter(x, y, actor_output_tensor_np, marker='.', alpha=0.09, label='actions')
         # critic_output_tensor_np = critic_output_tensor.detach().squeeze().numpy()
         # ax_1.scatter(x, y, critic_output_tensor_np, marker='.', alpha=0.1, label='critic values')
         ax_1.set_title('Outputs of NN')
@@ -201,31 +203,22 @@ def plot_graphs(actor_mean, actor_std, loss, loss_critic, i,
         plt.pause(0.05)
 
 
-def compute_rewards_to_go(rewards):
-    Val = 0
-    Vals = [0] * len(rewards)
-    for t in reversed(range(len(rewards))):
-        Val = rewards[t] + GAMMA * Val
-        Vals[t] = Val
-    return Vals
-
-
 def get_trajectories(scores, scores_avg):
 
     states, actions, rewards, dones, next_states = [], [], [], [], []
 
-    finish_to_collect = False
-    i_episode = 0
+    n_episodes = 0
+    episode_scores = []
 
-    while not finish_to_collect:
+    while not len(rewards) > BATCH_SIZE:
         state = env.reset()
         done = False
         episode_score = 0
-
         while not done:
             action = get_train_action(actor_old, state)
             plotter.neptune_plot({"action": action.item()})
             next_state, reward, done, info = env.step(action)
+
             states.append(state.detach().squeeze().numpy())
             actions.append(action.item())
             rewards.append(reward.item())
@@ -233,18 +226,18 @@ def get_trajectories(scores, scores_avg):
             next_states.append(next_state.detach().squeeze().numpy())
 
             state = next_state
-            i_episode += 1
             episode_score += reward.item()
-            finish_to_collect = True if len(rewards) > BATCH_SIZE else False
 
-        scores.append(episode_score)
-        scores_avg.append(scores_avg[-1] * 0.9 + episode_score * 0.1)
+        episode_scores.append(episode_score)
+        n_episodes += 1
         plotter.neptune_plot({"episode_score": episode_score})
-        print(f'\r(episode {i_episode + 1}, step {len(rewards)}), episode score: {episode_score}')
+        print(f'\r(episode {n_episodes + 1}, step {len(rewards)}), episode score: {episode_score}')
 
+    scores.append(np.mean(episode_scores))
+    scores_avg.append(scores_avg[-1] * 0.9 + np.mean(episode_scores) * 0.1)
     states = np.array(states)
     actions = np.array(actions)
-    rewards = np.array(rewards)
+    rewards = np.array(rewards) / n_episodes
     dones = np.array(dones)
     next_states = np.array(next_states)
 
@@ -263,7 +256,7 @@ def save_results(model_to_save, name):
 
 if __name__ == '__main__':
     # --------------------------- # PLOTTER & ENV # -------------------------- #
-    PLOT_PER = 2
+    PLOT_PER = 1
     plotter = ALGPlotter(plot_life=PLOT_LIVE, plot_neptune=NEPTUNE, name='my_run_ppo',
                          tags=["PPO", "clip_grad_norm", "b(s) = 0", ENV_NAME])
     env = SingleAgentEnv(env_name=ENV_NAME, plotter=plotter)
@@ -293,10 +286,12 @@ if __name__ == '__main__':
     plotter.matrix_update('actor', actor)
     fig = plt.figure(figsize=plt.figaspect(.5))
     fig.suptitle('My Run')
+    # ax_1 = fig.add_subplot(1, 1, 1, projection='3d')
     ax_1 = fig.add_subplot(1, 4, 1, projection='3d')
     ax_2 = fig.add_subplot(1, 4, 2)
     ax_3 = fig.add_subplot(1, 4, 3)
     ax_4 = fig.add_subplot(1, 4, 4)
+
 
     mean_list, std_list, loss_list_actor, loss_list_critic = [], [], [], []
 
