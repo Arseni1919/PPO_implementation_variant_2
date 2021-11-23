@@ -36,13 +36,19 @@ batch size | --- | 10000 | 5000 |
 GAMMA (discount rate) | --- | 0.99 | 0.995 |
 EPSILON (clipping ratios) | --- | 0.2 | 0.1 |
 LAMBDA / TAU (for GAE) | --- | 0.97 | 0.97 |
+ENTROPY ALPHA | --- | 0.02 | --- |
 Actor LR | --- | 0.001 | 0.001 |
 Critic LR | --- | 0.001 | 0.001 |
 
 
 # !!! What was important:
+- Clipping actions brought the std of action to explosion
 
-Add `torch.no_grad()` when it needed. Improvement was immediate.
+- Add an entropy term
+
+- Normalize the statistics of the state/observation
+
+- Add `torch.no_grad()` when it needed. Improvement was immediate
 ```python
 with torch.no_grad():
     # SAMPLE TRAJECTORIES
@@ -52,6 +58,8 @@ with torch.no_grad():
 ```
 
 ## Credits:
+
+- [TDS | Why Data should be Normalized before Training a Neural Network](https://towardsdatascience.com/why-data-should-be-normalized-before-training-a-neural-network-c626b7f66c7d#:~:text=Among%20the%20best%20practices%20for,and%20leads%20to%20faster%20convergence.)
 
 ### PPO
 

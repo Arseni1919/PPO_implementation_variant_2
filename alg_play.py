@@ -37,14 +37,40 @@ def load_and_play(env_to_play, times, path_to_load_model):
     play(env_to_play, times, model=model)
 
 
+class running_state:
+  def __init__(self, state):
+    self.len = 1
+    self.running_mean = state
+    self.running_std = state ** 2
+
+  def update(self, state):
+    self.len += 1
+    old_mean = self.running_mean.copy()
+    self.running_mean[...] = old_mean + (state - old_mean) / self.len
+    self.running_std[...] = self.running_std + (state - old_mean) * (state - self.running_mean)
+
+  def mean(self):
+    return self.running_mean
+
+  def std(self):
+    return np.sqrt(self.running_std / (self.len - 1))
+
+
 def play(env, times: int = 1, model: nn.Module = None, max_steps=-1):
     state = env.reset()
+    state_stat = running_state(env.reset().detach().squeeze().numpy())
     game = 0
     total_reward = 0
     step = 0
     while game < times:
         if model:
             # action = model(state)
+
+            state_np = state.detach().squeeze().numpy()
+            state_stat.update(state_np)
+            state_np = np.clip((state_np - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
+            state = torch.FloatTensor(state_np)
+
             action = get_action(model, state)
         else:
             action = env.action_space.sample()
@@ -70,7 +96,8 @@ def play(env, times: int = 1, model: nn.Module = None, max_steps=-1):
 if __name__ == '__main__':
     # torch.save(actor, f'{SAVE_PATH}/actor.pt')
     # torch.save(target_actor, f'{SAVE_PATH}/target_actor.pt')
-    actor_model = torch.load(f'data/actor_example_1.pt')
+    # actor_model = torch.load(f'data/actor_example_1.pt')
+    actor_model = torch.load(f'data/actor.pt')
     actor_model.eval()
     curr_env = SingleAgentEnv(env_name=ENV_NAME)
     play(curr_env, 10, actor_model)

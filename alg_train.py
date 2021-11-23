@@ -19,6 +19,7 @@ def get_train_action(net, observation):
 
 def train():
     plotter.info('Training...')
+    best_score = -100
     total_scores, total_avg_scores = [0], [0]
     state_stat = running_state(env.reset().detach().squeeze().numpy())
     # --------------------------- # MAIN LOOP # -------------------------- #
@@ -27,7 +28,7 @@ def train():
 
         with torch.no_grad():
             # SAMPLE TRAJECTORIES
-            states, actions, rewards, dones, next_states = get_trajectories(total_scores, total_avg_scores, state_stat)
+            states, actions, rewards, dones, next_states, average_score = get_trajectories(total_scores, total_avg_scores, state_stat)
             states_tensor = torch.tensor(states).float()
             actions_tensor = torch.tensor(actions).float()
             critic_values_tensor = critic(states_tensor).detach().squeeze()
@@ -48,22 +49,81 @@ def train():
         plot_neptune()
         plot_graphs(
             mean, std, loss_actor, loss_critic, i_update, actions_tensor, states_tensor, critic_values_tensor,
-            total_scores, total_avg_scores
+            total_scores, total_avg_scores, state_stat.mean(), state_stat.std()
         )
 
         # RENDER
-        if i_update > 50:
+        if i_update > N_UPDATES - 5:
             play(env, 1, actor_old)
             # pass
+
+        # SAVE
+        if average_score > best_score:
+            best_score = average_score
+            save_results(path_to_save, actor)
 
     # ---------------------------------------------------------------- #
 
     # FINISH TRAINING
-    plotter.close()
+    # plotter.close()
     plt.pause(0)
     plt.close()
     env.close()
     plotter.info('Finished train.')
+
+
+def get_trajectories(scores, scores_avg, state_stat):
+
+    states, actions, rewards, dones, next_states = [], [], [], [], []
+
+    n_episodes = 0
+    episode_scores = []
+
+    while not len(rewards) > BATCH_SIZE:
+        state = env.reset()
+
+        state_np = state.detach().squeeze().numpy()
+        state_stat.update(state_np)
+        state_np = np.clip((state_np - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
+        state = torch.FloatTensor(state_np)
+
+        done = False
+        episode_score = 0
+        while not done:
+            action = get_train_action(actor_old, state)
+            plotter.neptune_plot({"action": action.item()})
+            next_state, reward, done, info = env.step(action)
+
+            states.append(state.detach().squeeze().numpy())
+            actions.append(action.item())
+            rewards.append(reward.item())
+            dones.append(done.item())
+            next_states.append(next_state.detach().squeeze().numpy())
+
+            state = next_state
+
+            state_np = state.detach().squeeze().numpy()
+            state_stat.update(state_np)
+            state_np = np.clip((state_np - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
+            state = torch.FloatTensor(state_np)
+
+            episode_score += reward.item()
+
+        episode_scores.append(episode_score)
+        n_episodes += 1
+        plotter.neptune_plot({"episode_score": episode_score})
+
+    print(f'\r(episodes {n_episodes}, steps {len(rewards)}), average score: {np.mean(episode_scores)} {episode_scores}')
+
+    scores.append(np.mean(episode_scores))
+    scores_avg.append(scores_avg[-1] * 0.9 + np.mean(episode_scores) * 0.1)
+    states = np.array(states)
+    actions = np.array(actions)
+    rewards = np.array(rewards) / n_episodes
+    dones = np.array(dones)
+    next_states = np.array(next_states)
+
+    return states, actions, rewards, dones, next_states, np.mean(episode_scores)
 
 
 def compute_returns_and_advantages(rewards, dones, critic_values):
@@ -120,11 +180,11 @@ def update_actor(states_tensor, actions_tensor, advantages_tensor):
     ratio_of_probs = torch.exp(action_log_probs - action_log_probs_old)
     surrogate1 = ratio_of_probs * advantages_tensor
     surrogate2 = torch.clamp(ratio_of_probs, 1 - EPSILON, 1 + EPSILON) * advantages_tensor
-    loss_actor = - torch.min(surrogate1, surrogate2).mean()
+    loss_actor = - torch.min(surrogate1, surrogate2)
 
     # ADD ENTROPY TERM
-    # actor_dist_entropy = action_dist.entropy()
-    # loss_actor = torch.mean(loss_actor - 1e-2 * actor_dist_entropy)
+    actor_dist_entropy = action_dist.entropy().detach()
+    loss_actor = torch.mean(loss_actor - 1e-2 * actor_dist_entropy)
     # loss_actor = loss_actor - 1e-2 * actor_dist_entropy
 
     actor_optim.zero_grad()
@@ -160,13 +220,17 @@ def plot_neptune():
 
 def plot_graphs(actor_mean, actor_std, loss, loss_critic, i,
                 actor_output_tensor, observations_tensor, critic_output_tensor,
-                scores, avg_scores):
+                scores, avg_scores, state_stat_mean, state_stat_std):
     # PLOT
     # mean_list.append(actor_output_tensor.mean().detach().squeeze().item())
     mean_list.append(actor_mean.mean().detach().squeeze().item())
     std_list.append(actor_std.mean().detach().squeeze().item())
     loss_list_actor.append(loss.item())
     loss_list_critic.append(loss_critic.item())
+    list_state_mean_1.append(state_stat_mean[0])
+    list_state_mean_2.append(state_stat_mean[1])
+    list_state_std_1.append(state_stat_std[0])
+    list_state_std_2.append(state_stat_std[1])
 
     if i % PLOT_PER == 0:
         # AX 1
@@ -203,61 +267,18 @@ def plot_graphs(actor_mean, actor_std, loss, loss_critic, i,
         ax_4.set_title('Scores')
         ax_4.legend()
 
+        # AX 5
+        ax_5.cla()
+        ax_5.plot(list_state_mean_1, label='m1')
+        ax_5.plot(list_state_mean_2, label='m2')
+        ax_5.plot(list_state_std_1, label='s1')
+        ax_5.plot(list_state_std_2, label='s2')
+        ax_5.set_title('State stat')
+        ax_5.legend()
+
         plt.pause(0.05)
 
 
-def get_trajectories(scores, scores_avg, state_stat):
-
-    states, actions, rewards, dones, next_states = [], [], [], [], []
-
-    n_episodes = 0
-    episode_scores = []
-
-    while not len(rewards) > BATCH_SIZE:
-        state = env.reset()
-
-        state_np = state.detach().squeeze().numpy()
-        state_stat.update(state_np)
-        state_np = np.clip((state_np - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
-        state = torch.FloatTensor(state_np)
-
-        done = False
-        episode_score = 0
-        while not done:
-            action = get_train_action(actor_old, state)
-            plotter.neptune_plot({"action": action.item()})
-            next_state, reward, done, info = env.step(action)
-
-            states.append(state.detach().squeeze().numpy())
-            actions.append(action.item())
-            rewards.append(reward.item())
-            dones.append(done.item())
-            next_states.append(next_state.detach().squeeze().numpy())
-
-            state = next_state
-
-            state_np = state.detach().squeeze().numpy()
-            state_stat.update(state_np)
-            state_np = np.clip((state_np - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
-            state = torch.FloatTensor(state_np)
-
-            episode_score += reward.item()
-
-        episode_scores.append(episode_score)
-        n_episodes += 1
-        plotter.neptune_plot({"episode_score": episode_score})
-
-    print(f'\r(episodes {n_episodes}, steps {len(rewards)}), average scores: {np.mean(episode_scores)}')
-
-    scores.append(np.mean(episode_scores))
-    scores_avg.append(scores_avg[-1] * 0.9 + np.mean(episode_scores) * 0.1)
-    states = np.array(states)
-    actions = np.array(actions)
-    rewards = np.array(rewards) / n_episodes
-    dones = np.array(dones)
-    next_states = np.array(next_states)
-
-    return states, actions, rewards, dones, next_states
 
 
 class running_state:
@@ -279,19 +300,19 @@ class running_state:
     return np.sqrt(self.running_std / (self.len - 1))
 
 
-def save_results(model_to_save, name):
-    path_to_save = f'{SAVE_PATH}/{name}.pt'
+def save_results(path, model_to_save):
     # SAVE
     if SAVE_RESULTS:
         # SAVING...
-        plotter.info(f"Saving {name}'s model...")
-        torch.save(model_to_save, path_to_save)
-    return path_to_save
+        print(f"Saving model...")
+        torch.save(model_to_save, path)
+    return path
 
 
 if __name__ == '__main__':
     # --------------------------- # PLOTTER & ENV # -------------------------- #
     PLOT_PER = 1
+
     plotter = ALGPlotter(plot_life=PLOT_LIVE, plot_neptune=NEPTUNE, name='my_run_ppo',
                          tags=["PPO", "clip_grad_norm", "b(s) = 0", ENV_NAME])
     env = SingleAgentEnv(env_name=ENV_NAME, plotter=plotter)
@@ -300,7 +321,7 @@ if __name__ == '__main__':
     critic = CriticNet(obs_size=env.observation_size(), n_actions=env.action_size())
     actor = ActorNet(obs_size=env.observation_size(), n_actions=env.action_size())
     actor_old = ActorNet(obs_size=env.observation_size(), n_actions=env.action_size())
-
+    path_to_save = f'data/actor.pt'
     # --------------------------- # OPTIMIZERS # -------------------------- #
     critic_optim = torch.optim.Adam(critic.parameters(), lr=LR_CRITIC)
     actor_optim = torch.optim.Adam(actor.parameters(), lr=LR_ACTOR)
@@ -322,25 +343,25 @@ if __name__ == '__main__':
     fig = plt.figure(figsize=plt.figaspect(.3))
     fig.suptitle('My Run')
     # ax_1 = fig.add_subplot(1, 1, 1, projection='3d')
-    ax_1 = fig.add_subplot(1, 4, 1, projection='3d')
-    ax_2 = fig.add_subplot(1, 4, 2)
-    ax_3 = fig.add_subplot(1, 4, 3)
-    ax_4 = fig.add_subplot(1, 4, 4)
+    ax_1 = fig.add_subplot(1, 5, 1, projection='3d')
+    ax_2 = fig.add_subplot(1, 5, 2)
+    ax_3 = fig.add_subplot(1, 5, 3)
+    ax_4 = fig.add_subplot(1, 5, 4)
+    ax_5 = fig.add_subplot(1, 5, 5)
 
 
     mean_list, std_list, loss_list_actor, loss_list_critic = [], [], [], []
-
+    list_state_mean_1, list_state_std_1 = [], []
+    list_state_mean_2, list_state_std_2 = [], []
     # ---------------------------------------------------------------- #
     # ---------------------------------------------------------------- #
 
     # Main Process
     train()
 
-    # Save
-    path_actor_model = save_results(actor, name='actor')
 
     # Example Plays
     plotter.info('Example run...')
-    load_and_play(env, 5, path_actor_model)
+    load_and_play(env, 5, path_to_save)
 
     # ---------------------------------------------------------------- #
