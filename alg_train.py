@@ -25,15 +25,16 @@ def train():
     for i_update in range(N_UPDATES):
         plotter.info(f'Update {i_update + 1}')
 
-        # SAMPLE TRAJECTORIES
-        states, actions, rewards, dones, next_states = get_trajectories(total_scores, total_avg_scores, state_stat)
-        states_tensor = torch.tensor(states).float()
-        actions_tensor = torch.tensor(actions).float()
-        critic_values_tensor = critic(states_tensor).detach().squeeze()
-        critic_values = critic_values_tensor.numpy()
+        with torch.no_grad():
+            # SAMPLE TRAJECTORIES
+            states, actions, rewards, dones, next_states = get_trajectories(total_scores, total_avg_scores, state_stat)
+            states_tensor = torch.tensor(states).float()
+            actions_tensor = torch.tensor(actions).float()
+            critic_values_tensor = critic(states_tensor).detach().squeeze()
+            critic_values = critic_values_tensor.numpy()
 
-        # COMPUTE RETURNS AND ADVANTAGES
-        returns_tensor, advantages_tensor = compute_returns_and_advantages(rewards, dones, critic_values)
+            # COMPUTE RETURNS AND ADVANTAGES
+            returns_tensor, advantages_tensor = compute_returns_and_advantages(rewards, dones, critic_values)
 
         # UPDATE CRITIC
         loss_critic = update_critic(states_tensor, returns_tensor)
@@ -51,14 +52,15 @@ def train():
         )
 
         # RENDER
-        if i_update % 4 == 0 and i_update > 0:
-            # play(env, 1, actor)
-            pass
+        if i_update > 50:
+            play(env, 1, actor_old)
+            # pass
 
     # ---------------------------------------------------------------- #
 
     # FINISH TRAINING
     plotter.close()
+    plt.pause(0)
     plt.close()
     env.close()
     plotter.info('Finished train.')
@@ -244,7 +246,8 @@ def get_trajectories(scores, scores_avg, state_stat):
         episode_scores.append(episode_score)
         n_episodes += 1
         plotter.neptune_plot({"episode_score": episode_score})
-        print(f'\r(episode {n_episodes}, step {len(rewards)}), episode score: {episode_score}')
+
+    print(f'\r(episodes {n_episodes}, steps {len(rewards)}), average scores: {np.mean(episode_scores)}')
 
     scores.append(np.mean(episode_scores))
     scores_avg.append(scores_avg[-1] * 0.9 + np.mean(episode_scores) * 0.1)
@@ -316,7 +319,7 @@ if __name__ == '__main__':
     plotter.neptune_set_parameters()
     plotter.matrix_update('critic', critic)
     plotter.matrix_update('actor', actor)
-    fig = plt.figure(figsize=plt.figaspect(.5))
+    fig = plt.figure(figsize=plt.figaspect(.3))
     fig.suptitle('My Run')
     # ax_1 = fig.add_subplot(1, 1, 1, projection='3d')
     ax_1 = fig.add_subplot(1, 4, 1, projection='3d')
@@ -338,6 +341,6 @@ if __name__ == '__main__':
 
     # Example Plays
     plotter.info('Example run...')
-    load_and_play(env, 3, path_actor_model)
+    load_and_play(env, 5, path_actor_model)
 
     # ---------------------------------------------------------------- #

@@ -42,7 +42,14 @@ Critic LR | --- | 0.001 | 0.001 |
 
 # !!! What was important:
 
-
+Add `torch.no_grad()` when it needed. Improvement was immediate.
+```python
+with torch.no_grad():
+    # SAMPLE TRAJECTORIES
+    ...
+    # COMPUTE RETURNS AND ADVANTAGES
+    ...
+```
 
 ## Credits:
 

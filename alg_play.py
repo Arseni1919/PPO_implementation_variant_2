@@ -4,7 +4,25 @@ from alg_GLOBALS import *
 from alg_env_wrapper import SingleAgentEnv
 
 
+class Actor(nn.Module):
+    def __init__(self):
+        super(Actor, self).__init__()
+        self.fc1 = nn.Linear(2, 64)
+        self.fc2 = nn.Linear(64, 64)
+        self.fc_mean = nn.Linear(64, 1)
+        self.fc_log_std = nn.Linear(64, 1)
+
+    def forward(self, x):
+        x = F.elu(self.fc1(x))
+        x = F.elu(self.fc2(x))
+        action_mean = self.fc_mean(x)
+        action_std = torch.exp(self.fc_log_std(x))  # to be always positive number
+        return action_mean.squeeze(), action_std.squeeze()
+
+
 def get_action(net, observation):
+    if not isinstance(observation, torch.Tensor):
+        observation = torch.tensor(observation)
     action_mean, action_std = net(observation)
     action_dist = torch.distributions.Normal(action_mean, action_std)
     action = action_dist.sample()
@@ -52,7 +70,7 @@ def play(env, times: int = 1, model: nn.Module = None, max_steps=-1):
 if __name__ == '__main__':
     # torch.save(actor, f'{SAVE_PATH}/actor.pt')
     # torch.save(target_actor, f'{SAVE_PATH}/target_actor.pt')
-    actor_model = torch.load(f'{SAVE_PATH}/actor.pt')
+    actor_model = torch.load(f'data/actor_example_1.pt')
     actor_model.eval()
     curr_env = SingleAgentEnv(env_name=ENV_NAME)
     play(curr_env, 10, actor_model)
