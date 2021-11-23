@@ -31,14 +31,13 @@ Actor update                     | 1 | --- | 1 |
 
 Parameter | my run | example 1 | example 2
 --- | --- | --- | ---
-n of updates | --- | --- | 300 |
-batch size | --- | --- | 5000 |
-GAMMA (discount rate) | --- | --- | 0.995 |
-EPSILON (clipping ratios) | --- | --- | 0.1 |
-LAMBDA | --- | --- | (as TAU) |
-TAU (for GAE) | --- | --- | 0.97 |
-Actor LR | --- | --- | 0.001 |
-Critic LR | --- | --- | 0.001 |
+n of updates | --- | 100 | 300 |
+batch size | --- | 10000 | 5000 |
+GAMMA (discount rate) | --- | 0.99 | 0.995 |
+EPSILON (clipping ratios) | --- | 0.2 | 0.1 |
+LAMBDA / TAU (for GAE) | --- | 0.97 | 0.97 |
+Actor LR | --- | 0.001 | 0.001 |
+Critic LR | --- | 0.001 | 0.001 |
 
 
 # !!! What was important:
