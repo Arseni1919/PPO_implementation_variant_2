@@ -61,7 +61,8 @@ with torch.no_grad():
 
 - [TDS | Why Data should be Normalized before Training a Neural Network](https://towardsdatascience.com/why-data-should-be-normalized-before-training-a-neural-network-c626b7f66c7d#:~:text=Among%20the%20best%20practices%20for,and%20leads%20to%20faster%20convergence.)
 
-
+- [GitHub | PPO example 1](https://github.com/zzzxxxttt/pytorch_simple_RL)
+- [GitHub | PPO example 2](https://github.com/Abhipanda4/PPO-PyTorch)
 
 
 
