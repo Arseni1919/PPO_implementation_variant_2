@@ -19,7 +19,7 @@
 
 #### Sigmoid vs Tanh
 
-Same NN weights, input and optimizer. The only difference is the non-linearity function.
+There are the same NN weights, input and optimizer. The only difference is the non-linearity function.
 
 ![](static/research_norm_input.png)
 
