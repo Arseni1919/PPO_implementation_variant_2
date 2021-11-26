@@ -28,7 +28,8 @@ def train():
 
         with torch.no_grad():
             # SAMPLE TRAJECTORIES
-            states, actions, rewards, dones, next_states, average_score = get_trajectories(total_scores, total_avg_scores, state_stat)
+            states, actions, rewards, dones, next_states, average_score = get_trajectories(total_scores,
+                                                                                           total_avg_scores, state_stat)
             states_tensor = torch.tensor(states).float()
             actions_tensor = torch.tensor(actions).float()
             critic_values_tensor = critic(states_tensor).detach().squeeze()
@@ -43,7 +44,6 @@ def train():
         # UPDATE ACTOR
         # mean, std, loss_actor = update_actor(states_tensor, actions_tensor, returns_tensor)
         mean, std, loss_actor = update_actor(states_tensor, actions_tensor, advantages_tensor)
-
 
         # PLOTTER
         plot_neptune()
@@ -73,7 +73,6 @@ def train():
 
 
 def get_trajectories(scores, scores_avg, state_stat):
-
     states, actions, rewards, dones, next_states = [], [], [], [], []
 
     n_episodes = 0
@@ -279,25 +278,23 @@ def plot_graphs(actor_mean, actor_std, loss, loss_critic, i,
         plt.pause(0.05)
 
 
-
-
 class running_state:
-  def __init__(self, state):
-    self.len = 1
-    self.running_mean = state
-    self.running_std = state ** 2
+    def __init__(self, state):
+        self.len = 1
+        self.running_mean = state
+        self.running_std = state ** 2
 
-  def update(self, state):
-    self.len += 1
-    old_mean = self.running_mean.copy()
-    self.running_mean[...] = old_mean + (state - old_mean) / self.len
-    self.running_std[...] = self.running_std + (state - old_mean) * (state - self.running_mean)
+    def update(self, state):
+        self.len += 1
+        old_mean = self.running_mean.copy()
+        self.running_mean[...] = old_mean + (state - old_mean) / self.len
+        self.running_std[...] = self.running_std + (state - old_mean) * (state - self.running_mean)
 
-  def mean(self):
-    return self.running_mean
+    def mean(self):
+        return self.running_mean
 
-  def std(self):
-    return np.sqrt(self.running_std / (self.len - 1))
+    def std(self):
+        return np.sqrt(self.running_std / (self.len - 1))
 
 
 def save_results(path, model_to_save):
@@ -349,7 +346,6 @@ if __name__ == '__main__':
     ax_4 = fig.add_subplot(1, 5, 4)
     ax_5 = fig.add_subplot(1, 5, 5)
 
-
     mean_list, std_list, loss_list_actor, loss_list_critic = [], [], [], []
     list_state_mean_1, list_state_std_1 = [], []
     list_state_mean_2, list_state_std_2 = [], []
@@ -358,7 +354,6 @@ if __name__ == '__main__':
 
     # Main Process
     train()
-
 
     # Example Plays
     plotter.info('Example run...')

@@ -61,6 +61,8 @@ if __name__ == '__main__':
     LR = 4
     sigmoid_optim = torch.optim.SGD(sigmoid_model.parameters(), lr=LR)
     tanh_optim = torch.optim.SGD(tanh_model.parameters(), lr=LR)
+    # sigmoid_optim = torch.optim.Adam(sigmoid_model.parameters(), lr=LR)
+    # tanh_optim = torch.optim.Adam(tanh_model.parameters(), lr=LR)
 
     weights_sigmoid = np.zeros((50, 4))
     weights_tanh = np.zeros((50, 4))
