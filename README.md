@@ -17,7 +17,9 @@
 
 ### Importance of Normalizing Input
 
-Sigmoid vs Tanh:
+#### Sigmoid vs Tanh
+
+Same NN weights, same input and optimizer. the only difference is the non-linearity function.
 
 ![](static/research_norm_input.png)
 
