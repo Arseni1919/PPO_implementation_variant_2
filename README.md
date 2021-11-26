@@ -19,7 +19,7 @@
 
 #### Sigmoid vs Tanh
 
-Same NN weights, same input and optimizer. the only difference is the non-linearity function.
+Same NN weights, input and optimizer. The only difference is the non-linearity function.
 
 ![](static/research_norm_input.png)
 
@@ -71,6 +71,7 @@ with torch.no_grad():
 
 - [GitHub | PPO example 1](https://github.com/zzzxxxttt/pytorch_simple_RL)
 - [GitHub | PPO example 2](https://github.com/Abhipanda4/PPO-PyTorch)
+- [PyTorch | REPRODUCIBILITY](https://pytorch.org/docs/stable/notes/randomness.html)
 
 
 
