@@ -5,12 +5,6 @@ import torch
 from alg_GLOBALS import *
 
 
-X = np.random.random((100, 50)) - 0.5    # Random value between -0.5 and +0.5
-Y = np.where(X.mean(axis=1) > 0, 1, 0)  # 1 if X[i] > 0; 0 otherwise
-
-print(f'x: {X} \ny: {Y}')
-
-
 class SimpleModelSigmoid(nn.Module):
     def __init__(self):
         super(SimpleModelSigmoid, self).__init__()
@@ -45,72 +39,84 @@ class SimpleModelTanh(nn.Module):
         return self.net(input_value)
 
 
-x_tensor = torch.FloatTensor(X)
-y_tensor = torch.FloatTensor(Y)
+if __name__ == '__main__':
+    SEED = 111
+    torch.manual_seed(SEED)
+    random.seed(SEED)
+    np.random.seed(SEED)
 
-sigmoid_model = SimpleModelSigmoid()
-tanh_model = SimpleModelTanh()
-tanh_model.fc1.load_state_dict(sigmoid_model.fc1.state_dict())
-tanh_model.fc2.load_state_dict(sigmoid_model.fc2.state_dict())
+    X = np.random.random((100, 50)) - 0.5  # Random value between -0.5 and +0.5
+    Y = np.where(X.mean(axis=1) > 0, 1, 0)  # 1 if X[i] > 0; 0 otherwise
 
-LR = 4
-sigmoid_optim = torch.optim.SGD(sigmoid_model.parameters(), lr=LR)
-tanh_optim = torch.optim.SGD(tanh_model.parameters(), lr=LR)
+    print(f'x: {X} \ny: {Y}')
 
-weights_sigmoid = np.zeros((50, 4))
-weights_tanh = np.zeros((50, 4))
+    x_tensor = torch.FloatTensor(X)
+    y_tensor = torch.FloatTensor(Y)
 
-criterion = nn.CrossEntropyLoss()
-# criterion = nn.MSELoss()
+    sigmoid_model = SimpleModelSigmoid()
+    tanh_model = SimpleModelTanh()
+    tanh_model.fc1.load_state_dict(sigmoid_model.fc1.state_dict())
+    tanh_model.fc2.load_state_dict(sigmoid_model.fc2.state_dict())
 
-for epoc in range(50):
-    s_output_tensor = sigmoid_model(x_tensor).squeeze()
-    s_loss = criterion(s_output_tensor, y_tensor.long())
-    t_output_tensor = tanh_model(x_tensor).squeeze()
-    t_loss = criterion(t_output_tensor, y_tensor.long())
+    LR = 4
+    sigmoid_optim = torch.optim.SGD(sigmoid_model.parameters(), lr=LR)
+    tanh_optim = torch.optim.SGD(tanh_model.parameters(), lr=LR)
 
-    sigmoid_optim.zero_grad()
-    s_loss.backward()
-    sigmoid_optim.step()
+    weights_sigmoid = np.zeros((50, 4))
+    weights_tanh = np.zeros((50, 4))
 
-    tanh_optim.zero_grad()
-    t_loss.backward()
-    tanh_optim.step()
+    criterion = nn.CrossEntropyLoss()
+    # criterion = nn.MSELoss()
 
-    s_item = sigmoid_model.fc2.weight.data.squeeze().numpy()
-    weights_sigmoid[epoc] = s_item[0, :]
-    t_item = tanh_model.fc2.weight.data.squeeze().numpy()
-    weights_tanh[epoc] = t_item[0, :]
+    for epoc in range(50):
+        s_output_tensor = sigmoid_model(x_tensor).squeeze()
+        s_loss = criterion(s_output_tensor, y_tensor.long())
+        t_output_tensor = tanh_model(x_tensor).squeeze()
+        t_loss = criterion(t_output_tensor, y_tensor.long())
 
-    print(f'sigmoid loss: {s_loss.item()}, tanh loss: {t_loss.item()}')
+        sigmoid_optim.zero_grad()
+        s_loss.backward()
+        sigmoid_optim.step()
 
-# print(sigmoid_model(x_tensor).squeeze().detach().numpy())
-# print(tanh_model(x_tensor).squeeze().detach().numpy())
+        tanh_optim.zero_grad()
+        t_loss.backward()
+        tanh_optim.step()
 
-weights_sigmoid = np.array(weights_sigmoid)
-weights_tanh = np.array(weights_tanh)
-w = (weights_sigmoid[:, 0] - weights_sigmoid[:, 0].mean()) / (weights_sigmoid[:, 0].std() + 1e-4)
-# print(w)
-# plt.plot(w, label='w1')
+        s_item = sigmoid_model.fc2.weight.data.squeeze().numpy()
+        weights_sigmoid[epoc] = s_item[0, :]
+        t_item = tanh_model.fc2.weight.data.squeeze().numpy()
+        weights_tanh[epoc] = t_item[0, :]
 
-fig = plt.figure(figsize=plt.figaspect(.5))
-fig.suptitle('Analysis of Normalizing Input')
-# ax_1 = fig.add_subplot(1, 1, 1, projection='3d')
-ax_1 = fig.add_subplot(1, 2, 1)
-ax_2 = fig.add_subplot(1, 2, 2)
+        print(f'sigmoid loss: {s_loss.item()}, tanh loss: {t_loss.item()}')
 
-ax_1.plot(weights_sigmoid[:, 0], label='s1')
-ax_1.plot(weights_sigmoid[:, 1], label='s2')
-ax_1.plot(weights_sigmoid[:, 2], label='s3')
-ax_1.plot(weights_sigmoid[:, 3], label='s4')
-ax_1.set_title('Sigmoid')
-ax_1.legend()
+    # print(sigmoid_model(x_tensor).squeeze().detach().numpy())
+    # print(tanh_model(x_tensor).squeeze().detach().numpy())
 
-ax_2.plot(weights_tanh[:, 0], label='t1', marker='.')
-ax_2.plot(weights_tanh[:, 1], label='t2', marker='.')
-ax_2.plot(weights_tanh[:, 2], label='t3', marker='.')
-ax_2.plot(weights_tanh[:, 3], label='t4', marker='.')
-ax_2.set_title('Tanh')
-ax_2.legend()
+    weights_sigmoid = np.array(weights_sigmoid)
+    weights_tanh = np.array(weights_tanh)
+    w = (weights_sigmoid[:, 0] - weights_sigmoid[:, 0].mean()) / (weights_sigmoid[:, 0].std() + 1e-4)
+    # print(w)
+    # plt.plot(w, label='w1')
 
-plt.show()
+    fig = plt.figure(figsize=plt.figaspect(.5))
+    fig.suptitle('Analysis of Normalizing Input')
+    # ax_1 = fig.add_subplot(1, 1, 1, projection='3d')
+    ax_1 = fig.add_subplot(1, 2, 1)
+    ax_2 = fig.add_subplot(1, 2, 2)
+
+    ax_1.plot(weights_sigmoid[:, 0], label='s1')
+    ax_1.plot(weights_sigmoid[:, 1], label='s2')
+    ax_1.plot(weights_sigmoid[:, 2], label='s3')
+    ax_1.plot(weights_sigmoid[:, 3], label='s4')
+    ax_1.set_title('Sigmoid')
+    ax_1.legend()
+
+    ax_2.plot(weights_tanh[:, 0], label='t1', marker='.')
+    ax_2.plot(weights_tanh[:, 1], label='t2', marker='.')
+    ax_2.plot(weights_tanh[:, 2], label='t3', marker='.')
+    ax_2.plot(weights_tanh[:, 3], label='t4', marker='.')
+    ax_2.set_title('Tanh')
+    ax_2.legend()
+
+    plt.show()
+
