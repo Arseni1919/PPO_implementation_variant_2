@@ -15,6 +15,12 @@
 
 ![](static/Figure_2.png)
 
+### Importance of Normalizing Input
+
+Sigmoid vs Tanh:
+
+![](static/research_norm_input.png)
+
 ### Things one can compare with other example implementations
 
 Compare: my run, [example 1](https://github.com/zzzxxxttt/pytorch_simple_RL/blob/master/ppo_mtcar.py), [example 2](https://github.com/Abhipanda4/PPO-PyTorch)
