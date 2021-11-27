@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 from alg_plotter import ALGPlotter
-from alg_env_wrapper import SingleAgentEnv
+from alg_env_wrapper import SingleAgentEnv, MultiAgentEnv
 from alg_nets import *
 from alg_replay_buffer import ReplayBuffer
 from alg_play import load_and_play, play, get_action
@@ -292,7 +292,11 @@ if __name__ == '__main__':
     # ENV_NAME = "MountainCarContinuous-v0"
     # ENV_NAME = "CartPole-v1"
     # ENV_NAME = 'LunarLanderContinuous-v2'
-    ENV_NAME = "BipedalWalker-v3"
+    # ENV_NAME = "BipedalWalker-v3"
+
+    from pettingzoo.mpe import simple_v2
+    ENV_NAME = "simple_v2"
+    ENV = simple_v2.env(max_cycles=25, continuous_actions=False)
 
     # FOR PLOTS
     PLOT_PER = 1
@@ -304,7 +308,8 @@ if __name__ == '__main__':
 
     plotter = ALGPlotter(plot_life=PLOT_LIVE, plot_neptune=NEPTUNE, name='my_run_ppo',
                          tags=["PPO", "clip_grad_norm", "b(s) = 0", ENV_NAME])
-    env = SingleAgentEnv(env_name=ENV_NAME, plotter=plotter)
+    # env = SingleAgentEnv(env_name=ENV_NAME, plotter=plotter)
+    env = MultiAgentEnv(env=ENV)
     # state_stat = RunningStateStat(env.reset().detach().squeeze().numpy())
 
     # --------------------------- # NETS # -------------------------- #

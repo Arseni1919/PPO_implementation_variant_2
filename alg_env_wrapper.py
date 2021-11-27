@@ -4,7 +4,6 @@ import torch
 from alg_GLOBALS import *
 
 
-# from alg_plotter import plotter
 class RunningStateStat:
     def __init__(self, state_np):
         # state_np = state_tensor.detach().squeeze().numpy()
@@ -106,7 +105,34 @@ class SingleAgentEnv:
 
 
 class MultiAgentEnv:
-    def __init__(self):
+    def __init__(self, env):
+        self.env = env
+        self.state_stat = RunningStateStat(self.env.reset())
+
+    def observation_size(self):
         pass
 
-# env = SingleAgentEnv(env_name=ENV_NAME)
+    def action_size(self):
+        pass
+
+    def reset(self):
+        pass
+
+    def step(self):
+        pass
+
+    def render(self):
+        pass
+
+    def close(self):
+        pass
+
+    def _prepare_action(self):
+        pass
+
+    def sample_action(self):
+        pass
+
+    def sample_observation(self):
+        pass
+

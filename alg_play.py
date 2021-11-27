@@ -103,12 +103,22 @@ if __name__ == '__main__':
 
     # ENV_NAME = "MountainCarContinuous-v0"
     # ENV_NAME = "CartPole-v1"
-    ENV_NAME = 'LunarLanderContinuous-v2'
-    # ENV_NAME = "BipedalWalker-v3"
+    # ENV_NAME = 'LunarLanderContinuous-v2'
+    ENV_NAME = "BipedalWalker-v3"
 
     path_to_load = f'data/actor_{ENV_NAME}.pt'
 
-    actor_model = torch.load(path_to_load)
-    actor_model.eval()
-    curr_env = SingleAgentEnv(env_name=ENV_NAME)
+    if ENV_NAME in ['BipedalWalker-v3']:
+        load_dict = torch.load(path_to_load)
+        actor_model = load_dict['model']
+        actor_model.eval()
+        curr_env = SingleAgentEnv(env_name=ENV_NAME)
+        curr_env.state_stat.running_mean = load_dict['mean']
+        curr_env.state_stat.running_std = load_dict['std']
+        curr_env.state_stat.len = load_dict['len']
+    else:
+        actor_model = torch.load(path_to_load)
+        actor_model.eval()
+        curr_env = SingleAgentEnv(env_name=ENV_NAME)
+
     play(curr_env, 20, actor_model)
