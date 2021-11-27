@@ -71,6 +71,7 @@ with torch.no_grad():
 - [GitHub | PPO example 1](https://github.com/zzzxxxttt/pytorch_simple_RL)
 - [GitHub | PPO example 2](https://github.com/Abhipanda4/PPO-PyTorch)
 - [PyTorch | REPRODUCIBILITY](https://pytorch.org/docs/stable/notes/randomness.html)
+- [PyTorch | SAVING AND LOADING MODELS](https://pytorch.org/tutorials/beginner/saving_loading_models.html)
 - [neptune.ai | Understanding Gradient Clipping (and How It Can Fix Exploding Gradients Problem)](https://neptune.ai/blog/understanding-gradient-clipping-and-how-it-can-fix-exploding-gradients-problem)
 
 

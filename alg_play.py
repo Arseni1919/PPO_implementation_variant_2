@@ -100,7 +100,15 @@ if __name__ == '__main__':
     # torch.save(actor, f'{SAVE_PATH}/actor.pt')
     # torch.save(target_actor, f'{SAVE_PATH}/target_actor.pt')
     # actor_model = torch.load(f'data/actor_example_1.pt')
-    actor_model = torch.load(f'data/actor.pt')
+
+    # ENV_NAME = "MountainCarContinuous-v0"
+    # ENV_NAME = "CartPole-v1"
+    ENV_NAME = 'LunarLanderContinuous-v2'
+    # ENV_NAME = "BipedalWalker-v3"
+
+    path_to_load = f'data/actor_{ENV_NAME}.pt'
+
+    actor_model = torch.load(path_to_load)
     actor_model.eval()
     curr_env = SingleAgentEnv(env_name=ENV_NAME)
-    play(curr_env, 10, actor_model)
+    play(curr_env, 20, actor_model)
