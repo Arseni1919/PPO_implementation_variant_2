@@ -3,7 +3,33 @@ import torch
 
 from alg_GLOBALS import *
 
+
 # from alg_plotter import plotter
+class RunningStateStat:
+    def __init__(self, state_np):
+        # state_np = state_tensor.detach().squeeze().numpy()
+        self.len = 1
+        self.running_mean = state_np
+        self.running_std = state_np ** 2
+
+    def update(self, state):
+        self.len += 1
+        old_mean = self.running_mean.copy()
+        self.running_mean[...] = old_mean + (state - old_mean) / self.len
+        self.running_std[...] = self.running_std + (state - old_mean) * (state - self.running_mean)
+
+    def mean(self):
+        return self.running_mean
+
+    def std(self):
+        return np.sqrt(self.running_std / (self.len - 1))
+
+    def get_normalized(self, state_tensor):
+        state_np = state_tensor.detach().squeeze().numpy()
+        self.update(state_np)
+        state_np = np.clip((state_np - self.mean()) / (self.std() + 1e-6), -10., 10.)
+        output_state_tensor = torch.FloatTensor(state_np)
+        return output_state_tensor
 
 
 class SingleAgentEnv:
@@ -13,10 +39,12 @@ class SingleAgentEnv:
         self.env = gym.make(env_name)
         self.action_space = self.env.action_space
         self.observation_space = self.env.observation_space
+        self.state_stat = RunningStateStat(self.env.reset())
 
     def reset(self):
         observation = self.env.reset()
-        observation = Variable(torch.tensor(observation, requires_grad=True).float().unsqueeze(0))
+        observation = torch.tensor(observation, requires_grad=True).float().unsqueeze(0)
+        observation = self.state_stat.get_normalized(observation)
         return observation
 
     def render(self):
@@ -29,15 +57,17 @@ class SingleAgentEnv:
 
     def sample_observation(self):
         observation = self.env.observation_space.sample()
-        observation = Variable(torch.tensor(observation, requires_grad=True).float().unsqueeze(0))
+        observation = torch.tensor(observation, requires_grad=True).float().unsqueeze(0)
+        observation = self.state_stat.get_normalized(observation)
         return observation
 
     def step(self, action):
         action = self.prepare_action(action)
         observation, reward, done, info = self.env.step(action)
-        observation = Variable(torch.tensor(observation, requires_grad=True).float().unsqueeze(0))
+        observation = torch.tensor(observation, requires_grad=True).float().unsqueeze(0)
         reward = Variable(torch.tensor(reward).float().unsqueeze(0))
         done = torch.tensor(done)
+        observation = self.state_stat.get_normalized(observation)
         return observation, reward, done, info
 
     def prepare_action(self, action):
@@ -78,6 +108,5 @@ class SingleAgentEnv:
 class MultiAgentEnv:
     def __init__(self):
         pass
-
 
 # env = SingleAgentEnv(env_name=ENV_NAME)

@@ -37,39 +37,42 @@ def load_and_play(env_to_play, times, path_to_load_model):
     play(env_to_play, times, model=model)
 
 
-class running_state:
-  def __init__(self, state):
-    self.len = 1
-    self.running_mean = state
-    self.running_std = state ** 2
-
-  def update(self, state):
-    self.len += 1
-    old_mean = self.running_mean.copy()
-    self.running_mean[...] = old_mean + (state - old_mean) / self.len
-    self.running_std[...] = self.running_std + (state - old_mean) * (state - self.running_mean)
-
-  def mean(self):
-    return self.running_mean
-
-  def std(self):
-    return np.sqrt(self.running_std / (self.len - 1))
+# class RunningStateStat:
+#     def __init__(self, state):
+#         self.len = 1
+#         self.running_mean = state
+#         self.running_std = state ** 2
+#
+#     def update(self, state):
+#         self.len += 1
+#         old_mean = self.running_mean.copy()
+#         self.running_mean[...] = old_mean + (state - old_mean) / self.len
+#         self.running_std[...] = self.running_std + (state - old_mean) * (state - self.running_mean)
+#
+#     def mean(self):
+#         return self.running_mean
+#
+#     def std(self):
+#         return np.sqrt(self.running_std / (self.len - 1))
+#
+#     def get_normalized_state(self, state_tensor):
+#         state_np = state_tensor.detach().squeeze().numpy()
+#         self.update(state_np)
+#         state_np = np.clip((state_np - self.mean()) / (self.std() + 1e-6), -10., 10.)
+#         output_state_tensor = torch.FloatTensor(state_np)
+#         return output_state_tensor
 
 
 def play(env, times: int = 1, model: nn.Module = None, max_steps=-1):
     state = env.reset()
-    state_stat = running_state(env.reset().detach().squeeze().numpy())
+    # state_stat = RunningStateStat(env.reset().detach().squeeze().numpy())
     game = 0
     total_reward = 0
     step = 0
     while game < times:
         if model:
             # action = model(state)
-
-            state_np = state.detach().squeeze().numpy()
-            state_stat.update(state_np)
-            state_np = np.clip((state_np - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
-            state = torch.FloatTensor(state_np)
+            # state = state_stat.get_normalized_state(state)
 
             action = get_action(model, state)
         else:

@@ -13,7 +13,6 @@ def get_train_action(net, observation):
     action_mean, action_std = net(observation)
     action_dist = torch.distributions.Normal(action_mean, action_std)
     action = action_dist.sample()
-    # clipped_action = torch.clamp(action, min=-1, max=1)
     return action
 
 
@@ -21,15 +20,13 @@ def train():
     plotter.info('Training...')
     best_score = -100
     total_scores, total_avg_scores = [0], [0]
-    state_stat = running_state(env.reset().detach().squeeze().numpy())
     # --------------------------- # MAIN LOOP # -------------------------- #
     for i_update in range(N_UPDATES):
         plotter.info(f'Update {i_update + 1}')
 
         with torch.no_grad():
             # SAMPLE TRAJECTORIES
-            states, actions, rewards, dones, next_states, average_score = get_trajectories(total_scores,
-                                                                                           total_avg_scores, state_stat)
+            states, actions, rewards, dones, next_states, average_score = get_trajectories(total_scores, total_avg_scores)  # , state_stat)
             states_tensor = torch.tensor(states).float()
             actions_tensor = torch.tensor(actions).float()
             critic_values_tensor = critic(states_tensor).detach().squeeze()
@@ -49,7 +46,7 @@ def train():
         plot_neptune()
         plot_graphs(
             mean, std, loss_actor, loss_critic, i_update, actions_tensor, states_tensor, critic_values_tensor,
-            total_scores, total_avg_scores, state_stat.mean(), state_stat.std()
+            total_scores, total_avg_scores, env.state_stat.mean(), env.state_stat.std()
         )
 
         # RENDER
@@ -67,12 +64,12 @@ def train():
     # FINISH TRAINING
     # plotter.close()
     plt.pause(0)
-    plt.close()
+    # plt.close()
     env.close()
     plotter.info('Finished train.')
 
 
-def get_trajectories(scores, scores_avg, state_stat):
+def get_trajectories(scores, scores_avg):
     states, actions, rewards, dones, next_states = [], [], [], [], []
 
     n_episodes = 0
@@ -80,11 +77,6 @@ def get_trajectories(scores, scores_avg, state_stat):
 
     while not len(rewards) > BATCH_SIZE:
         state = env.reset()
-
-        state_np = state.detach().squeeze().numpy()
-        state_stat.update(state_np)
-        state_np = np.clip((state_np - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
-        state = torch.FloatTensor(state_np)
 
         done = False
         episode_score = 0
@@ -100,11 +92,7 @@ def get_trajectories(scores, scores_avg, state_stat):
             next_states.append(next_state.detach().squeeze().numpy())
 
             state = next_state
-
-            state_np = state.detach().squeeze().numpy()
-            state_stat.update(state_np)
-            state_np = np.clip((state_np - state_stat.mean()) / (state_stat.std() + 1e-6), -10., 10.)
-            state = torch.FloatTensor(state_np)
+            # state = state_stat.get_normalized_state(state)
 
             episode_score += reward.item()
 
@@ -172,9 +160,6 @@ def update_actor(states_tensor, actions_tensor, advantages_tensor):
     # UPDATE OLD NET
     for target_param, param in zip(actor_old.parameters(), actor.parameters()):
         target_param.data.copy_(param.data)
-    # soft_update(actor_old, actor, TAU)
-    # if i_update % 5 == 0:
-    #     actor_old.load_state_dict(actor.state_dict())
 
     ratio_of_probs = torch.exp(action_log_probs - action_log_probs_old)
     surrogate1 = ratio_of_probs * advantages_tensor
@@ -268,33 +253,14 @@ def plot_graphs(actor_mean, actor_std, loss, loss_critic, i,
 
         # AX 5
         ax_5.cla()
-        ax_5.plot(list_state_mean_1, label='m1')
-        ax_5.plot(list_state_mean_2, label='m2')
+        ax_5.plot(list_state_mean_1, label='m1', marker='.')
+        ax_5.plot(list_state_mean_2, label='m2', marker='.')
         ax_5.plot(list_state_std_1, label='s1')
         ax_5.plot(list_state_std_2, label='s2')
         ax_5.set_title('State stat')
         ax_5.legend()
 
         plt.pause(0.05)
-
-
-class running_state:
-    def __init__(self, state):
-        self.len = 1
-        self.running_mean = state
-        self.running_std = state ** 2
-
-    def update(self, state):
-        self.len += 1
-        old_mean = self.running_mean.copy()
-        self.running_mean[...] = old_mean + (state - old_mean) / self.len
-        self.running_std[...] = self.running_std + (state - old_mean) * (state - self.running_mean)
-
-    def mean(self):
-        return self.running_mean
-
-    def std(self):
-        return np.sqrt(self.running_std / (self.len - 1))
 
 
 def save_results(path, model_to_save):
@@ -308,17 +274,38 @@ def save_results(path, model_to_save):
 
 if __name__ == '__main__':
     # --------------------------- # PLOTTER & ENV # -------------------------- #
+    # FOR ALGORITHM
+    BATCH_SIZE = 5000
+    N_UPDATES = 100
+    LR_CRITIC = 1e-3
+    LR_ACTOR = 1e-3
+    GAMMA = 0.995  # discount factor
+    EPSILON = 0.1
+    SIGMA = 0.4
+    LAMBDA = 0.97
+
+    ENV_NAME = "MountainCarContinuous-v0"
+    # ENV_NAME = "CartPole-v1"
+    # ENV_NAME = 'LunarLanderContinuous-v2'
+    # ENV_NAME = "BipedalWalker-v3"
+
+    # FOR PLOTS
     PLOT_PER = 1
+    SAVE_RESULTS = True
+    path_to_save = f'data/actor_{ENV_NAME}.pt'
+    # NEPTUNE = True
+    NEPTUNE = False
+    PLOT_LIVE = False
 
     plotter = ALGPlotter(plot_life=PLOT_LIVE, plot_neptune=NEPTUNE, name='my_run_ppo',
                          tags=["PPO", "clip_grad_norm", "b(s) = 0", ENV_NAME])
     env = SingleAgentEnv(env_name=ENV_NAME, plotter=plotter)
+    # state_stat = RunningStateStat(env.reset().detach().squeeze().numpy())
 
     # --------------------------- # NETS # -------------------------- #
     critic = CriticNet(obs_size=env.observation_size(), n_actions=env.action_size())
     actor = ActorNet(obs_size=env.observation_size(), n_actions=env.action_size())
     actor_old = ActorNet(obs_size=env.observation_size(), n_actions=env.action_size())
-    path_to_save = f'data/actor.pt'
     # --------------------------- # OPTIMIZERS # -------------------------- #
     critic_optim = torch.optim.Adam(critic.parameters(), lr=LR_CRITIC)
     actor_optim = torch.optim.Adam(actor.parameters(), lr=LR_ACTOR)
